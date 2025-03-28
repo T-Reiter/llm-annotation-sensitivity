@@ -1,0 +1,9 @@
+# gitignore 
+
+AVA_images/
+Data_Collection/
+Tweets_CK/
+
+ground_truth_dataset.csv
+tweets_annotated.csv
+api_key.py
