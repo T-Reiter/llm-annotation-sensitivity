@@ -3,7 +3,6 @@
 AVA_images/
 Data_Collection/
 Tweets_CK/
+Davidson_Original_Data/
 
-ground_truth_dataset.csv
-tweets_annotated.csv
 api_key.py
