@@ -260,35 +260,87 @@ overall_HS <- final_summary %>% filter(version == "overall") %>% pull(HS)
 # ------------------------------------------------------------------
 # 2) now plot proportions in the same 2×4 faceted style
 # ------------------------------------------------------------------
+## ---- proportions plot with matching legend style --------------------------
 ggplot(df_prop, aes(x = condition, y = Value, fill = Measure)) +
   geom_col(position = position_dodge(0.8), width = 0.7) +
-  geom_hline(yintercept = overall_OL, linetype = "dashed", color = "#1f77b4") +
-  geom_hline(yintercept = overall_HS, linetype = "dashed", color = "#ff7f0e") +
+  
+  ## reference lines — map colour & linetype so they appear in the legend
+  geom_hline(aes(yintercept = overall_OL,
+                 colour     = "OL reference",
+                 linetype   = "OL reference"),
+             size = 0.8) +
+  geom_hline(aes(yintercept = overall_HS,
+                 colour     = "HS reference",
+                 linetype   = "HS reference"),
+             size = 0.8) +
+  
+  ## facet layout differs from the first plot
   facet_grid(
     shot ~ group_type,
     scales = "free_x",
     space  = "free_x",
     switch = "y"
   ) +
-  scale_fill_manual(values = c(OL = "#1f77b4", HS = "#ff7f0e")) +
-  # ensure y goes 0–1
-  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.25)) +
-  labs(x = NULL, y = NULL, fill = "Measure") +
+  
+  ## bars
+  scale_fill_manual(
+    name   = "Measure",
+    values = c(OL = "#1f77b4", HS = "#ff7f0e")
+  ) +
+  
+  ## reference-line legend (colour & linetype share labels)
+  scale_colour_manual(
+    name   = "Reference\n(Kern et al. (2023))",
+    values = c("OL reference" = "#1f77b4",
+               "HS reference" = "#ff7f0e")
+  ) +
+  scale_linetype_manual(
+    name   = "Reference\n(Kern et al. (2023))",
+    values = c("OL reference" = "dashed",
+               "HS reference" = "dashed")
+  ) +
+  
+  ## keep the Measure legend above the Reference legend
+  guides(
+    fill      = guide_legend(order = 1),
+    colour    = guide_legend(order = 2),
+    linetype  = guide_legend(order = 2)
+  ) +
+  
+  ## y-axis: 0–1 with 0·25 ticks (same as first plot)
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, by = 0.25),
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  
+  labs(
+    x   = NULL,
+    y   = NULL          # you kept it blank here
+  ) +
+  
+  ## theme tweaks copied from the finished first plot
   theme_bw(base_size = 14) +
   theme(
     axis.text.x          = element_text(angle = 90, vjust = 0.5, hjust = 1),
     strip.placement      = "outside",
     strip.background     = element_blank(),
-    legend.position      = c(1, 1),
-    legend.justification = c(1, 1),
+    
+    legend.position      = "right",
+    legend.box           = "vertical",
+    legend.text          = element_text(size = 13),
+    legend.title         = element_text(size = 13, face = "bold"),
+    legend.background    = element_rect(fill = "transparent", colour = "transparent"),
+    
     panel.grid.major.x   = element_blank(),
     panel.grid.minor     = element_blank()
   )
 
+
 # save
-# ggsave("Plots/hs_ol_descr_x.png", last_plot(), 
-#        dpi = 300,
-#        width = 24, height = 10, units = "in")
+ggsave("Plots/R/hs_ol_descr_x_zerofew.png", last_plot(),
+       dpi = 300,
+       width = 24, height = 10, units = "in")
 
 
 #################
@@ -688,11 +740,15 @@ ggplot(heat_df,
   geom_text(aes(label = ifelse(is.na(value), "", sprintf("%.2f", value))),
             size = 3) +
   scale_y_discrete(limits = rev) + 
+  scale_x_discrete(
+    labels = function(x) ifelse(x == "gap", "", 
+                                ifelse(x == 'reference_agreement',
+                                       'Reference',x))) +
   scale_fill_gradientn(
     colours   = coolwarm(100),
     limits    = c(0, 1),
     na.value  = "white",
-    name      = "Kappa (Cohen's or Fleiss')"
+    name      = "Kappa\n(Cohen's /\nFleiss')"
   ) +
   facet_grid(outcome ~ shot, switch = "both") +
   theme_minimal(base_size = 14) +
