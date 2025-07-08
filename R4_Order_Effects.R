@@ -133,7 +133,7 @@ df_prop <- df_melt %>%
   )
 
 
-### add geom smooth slopes
+### plot geom smooth slopes
 palette <- c(OL = "#1f77b4", HS = "#ff7f0e")
 
 g <- ggplot(df_prop,
@@ -142,12 +142,23 @@ g <- ggplot(df_prop,
                 fill = Measure)) +
   geom_point(size = 1.2) +
   geom_smooth(method = "glm", formula = y ~ x, se = TRUE) +
+  scale_x_continuous(breaks = 1:6,
+                     limits = c(1,6)) +
   scale_colour_manual(values = palette, name = NULL) +
   scale_fill_manual(values = palette, guide = "none") + 
   facet_grid(rows = vars(shot_base), cols = vars(group_type)) +
   labs(x = "Tweet Position in Batch",
        y = "Proportion") +
-  theme_bw()
+  theme_bw(base_size = 14) +
+  theme(
+    # make facet labels bold
+    strip.text      = element_text(face = "bold"),
+    # optionally bump axis titles & text further
+    axis.title      = element_text(size = 16),
+    axis.text       = element_text(size = 14),
+    legend.text     = element_text(size = 14),
+    legend.title    = element_text(size = 16)
+  )
 
 g
 
@@ -244,74 +255,19 @@ ggsave("Plots/R/order_effects_linear_all.pdf",
 
 
 
-
-
-
 ################################################################################
 ### PLOT LINEAR EFFECTS (BATCH CONDITIONS ONLY) (LMM)
 ################################################################################
-# ──────────────────────────────────────────────────────────────
-# 1.  DATA PREPARATION   (melt, filter, derive facet keys)
-# ──────────────────────────────────────────────────────────────
-df_melt <- df_long %>% filter(grepl('batch', condition)) %>% 
-  pivot_longer(cols = c(OL, HS),
-               names_to = "Measure",
-               values_to = "Label") %>%
-  select(batch_id, condition, tweet_in_batch, shot, Measure, Label) %>%
-  ## 1b) drop C.OL↔HS and C.HS↔OL mismatches
-  filter(!(str_detect(condition, "C\\.OL") & Measure == "HS") &
-           !(str_detect(condition, "C\\.HS") & Measure == "OL")) %>%
-  ## 1c) strip “.OL” / “.HS”
-  mutate(condition = str_remove(condition, "\\.OL|\\.HS")) %>%
-  ## 1d) derive facet columns
-  mutate(
-    group_type = case_when(
-      !str_detect(condition, "_")       ~ "base",
-      str_ends(condition, "_batch_conf")~ "batch_conf",
-      str_ends(condition, "_conf")      ~ "conf",
-      str_ends(condition, "_batch")     ~ "batch",
-      TRUE                              ~ "other"
-    ),
-    base_condition = str_split_fixed(condition, "_", 2)[,1],
-    shot_base = paste0(shot, "_", base_condition)
-  ) %>%
-  mutate(
-    group_type = factor(group_type,
-                        levels = c("base","conf","batch","batch_conf"))
-  )
 
-row_order <- c(paste0("few-shot_" , LETTERS[1:3]))
+### subset batch data
+df_melt_batch <- df_melt %>% filter(grepl('batch', condition))
+df_prop_batch <- df_prop %>% filter(grepl('batch', condition))
+pvals_batch <- pvals %>% filter(grepl('batch', group_type))
 
-df_melt <- df_melt %>%
-  mutate(shot_base = factor(shot_base, levels = row_order))
-
-# ──────────────────────────────────────────────────────────────
-# 2.  PROPORTIONS FOR PLOT
-# ──────────────────────────────────────────────────────────────
-df_prop <- df_melt %>%
-  group_by(shot, condition, tweet_in_batch, Measure) %>%
-  summarise(Proportion = mean(Label, na.rm = TRUE), .groups = "drop") %>%
-  mutate(
-    group_type = case_when(
-      !str_detect(condition, "_")       ~ "base",
-      str_ends(condition, "_batch_conf")~ "batch_conf",
-      str_ends(condition, "_conf")      ~ "conf",
-      str_ends(condition, "_batch")     ~ "batch",
-      TRUE                              ~ "other"
-    ),
-    base_condition = str_split_fixed(condition, "_", 2)[,1],
-    shot_base = factor(paste0(shot, "_", base_condition),
-                       levels = row_order),
-    group_type = factor(group_type,
-                        levels = c("base","conf","batch","batch_conf"))
-  )
-
-# ──────────────────────────────────────────────────────────────
-# 3.  FACETTED OLS LINES (ggplot2)
-# ──────────────────────────────────────────────────────────────
+### plot geom smooth slopes
 palette <- c(OL = "#1f77b4", HS = "#ff7f0e")
 
-g <- ggplot(df_prop,
+g <- ggplot(df_prop_batch,
             aes(tweet_in_batch, Proportion, 
                 colour = Measure,
                 fill = Measure)) +
@@ -326,44 +282,13 @@ g <- ggplot(df_prop,
 
 g
 
-# ──────────────────────────────────────────────────────────────
-# 4.  GLMMs (binomial logit)  — one per facet × Measure
-#     Formula: Label ~ tweet_in_batch + (1 | batch_id)
-# ──────────────────────────────────────────────────────────────
-combos <- df_melt %>%
-  distinct(shot_base, group_type, Measure)
-
-pvals <- combos %>%
-  mutate(p_value = pmap_dbl(list(shot_base, group_type, Measure),
-                            function(sb, gt, meas) {
-                              sub <- df_melt %>%
-                                filter(shot_base == sb, group_type == gt, Measure == meas)
-                              
-                              # skip if not enough variation
-                              if(n_distinct(sub$batch_id) < 2 ||
-                                 length(unique(sub$Label)) < 2) return(1)
-                              
-                              fit <- tryCatch(
-                                glmer(Label ~ tweet_in_batch + (1 | batch_id),
-                                      data = sub, family = binomial,
-                                      control = glmerControl(optimizer = "bobyqa")),
-                                error = function(e) NULL
-                              )
-                              if(is.null(fit)) return(1)
-                              
-                              p <- summary(fit)$coefficients["tweet_in_batch", "Pr(>|z|)"]
-                              p
-                            }))
-
-# ──────────────────────────────────────────────────────────────
-# 5.  SHADE FACETS WHERE EITHER OL OR HS IS SIGNIFICANT
-# ──────────────────────────────────────────────────────────────
-sig_panels <- pvals %>%
+### sahde facets
+sig_panels_batch <- pvals_batch %>%
   group_by(shot_base, group_type) %>%
   summarise(sig = any(p_value < 0.05/12), .groups = "drop") %>%
   filter(sig)
 
-if(nrow(sig_panels)) {
+if(nrow(sig_panels_batch)) {
   g <- g +
     geom_rect(data = sig_panels,
               inherit.aes = FALSE,
@@ -375,32 +300,36 @@ if(nrow(sig_panels)) {
 }
 g
 
-# ──────────────────────────────────────────────────────────────
-# 6.  ADD ASTERISKS FOR EACH SIGNIFICANT MEASURE
-# ──────────────────────────────────────────────────────────────
-asterisks <- pvals %>%
+### add asterisks
+asterisks_batch <- pvals_batch %>%
   filter(p_value < 0.05/12) %>%
-  mutate(y = c(0.90, 0.82)[match(Measure, c("OL","HS"))],
+  mutate(y = 0.9,
+         hjust = c(2.5, 1.5)[match(Measure, c("OL","HS"))],
          label = "*")
 
 g <- g +
-  geom_text(data = asterisks,
+  geom_text(data = asterisks_batch,
             inherit.aes = FALSE,
             aes(x = Inf, y = y, label = label, 
-                colour = Measure),
-            hjust = 1.5, vjust = 0.5, size = 10,
+                colour = Measure, hjust = hjust),
+            vjust = 0.6, size = 10,
             fontface = "bold",
             show.legend = FALSE) +
   scale_colour_manual(values = palette, name = NULL) +
-  scale_fill_manual(values = palette, guide = "none") + 
-  ggtitle("Effect of Position on OL/HS Proportions (asterisks = GLMM slope p < 0.05/24; random intercept = batch_id)")
+  scale_fill_manual(values = palette, guide = "none") 
 
 g
 
 
-ggsave("Plots/R/order_effects_linear_batch_only.png", last_plot(),
-       dpi = 300,
-       width = 24, height = 10, units = "in")
+# save
+ggsave("Plots/R/order_effects_linear_batch_only.pdf", 
+       last_plot(),
+       device = cairo_pdf,     
+       width  = 29,            # close to dina4
+       height = 13,             
+       units  = "cm"
+)
+
 
 
 
