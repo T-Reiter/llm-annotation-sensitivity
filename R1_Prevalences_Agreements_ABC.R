@@ -1,9 +1,33 @@
+################################################################################
+### Pre-Req
+################################################################################
 
+### load packages
 library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(DescTools)  
+library(irr)  
+library(tidyverse)   
+library(stringr)
+library(patchwork)   
+library(RColorBrewer)
+library(data.table)
+library(purrr)
+library(lme4)
+
+### Set WD and clear environment
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # wd = source loc
+rm(list = ls())
+
+
+
 ################################################################################
 ### Load the Kern Original Data
 ################################################################################
+
 folder_path <- "Tweets_CK"
 train_file  <- "full_train_s.csv"
 test_file   <- "full_test_s.csv"
@@ -33,7 +57,7 @@ tweets_full <- tweets_full %>%
 
 
 ################################################################################
-### Reproduce the Kern Table
+### Reproduce the Kern et al. (2023) Table for Test Purposes 
 ################################################################################
 summary <- tweets_full %>%
   group_by(version) %>%
@@ -68,7 +92,7 @@ print(final_summary)
 ### Load and RBind the GPT Labelled Tweets
 ################################################################################
 
-# zero shot
+# zero shot (older and smaller sample size --> only used during initial expl.)
 date_to_import_z <- "2025_04_10"
 files_z <- list.files(
   path = "Data_Collection/",
@@ -80,14 +104,13 @@ combined_df_z <- files_z %>%
   map_df(read_csv, .id = "source") %>%     
   arrange(batch_id, tweet_in_batch) %>%
   mutate(shot = "zero-shot") %>%
-  # insert 'shot' as 5th column:
   select(1:4, shot, everything())
 
 combined_df_z$R1_score <- as.character(combined_df_z$R1_score)
 combined_df_z$R2_score <- as.character(combined_df_z$R2_score)
 combined_df_z$R3_score <- as.character(combined_df_z$R3_score)
 
-# few shot
+# few shot (main sample)
 date_to_import_f <- "2025_07_01"
 files_f <- list.files(
   path = "Data_Collection/OL_NH/",
@@ -123,9 +146,7 @@ shared_cols <- c(
 
 # wide to long
 df_long <- combined_df %>%
-  # keep only shared cols + all R*- columns
   select(batch_id, tweet_in_batch, tweet_id, tweet, condition, shot, starts_with("R")) %>%
-  # split names like "R1_label" into responder = "R1" and .value = "label"
   pivot_longer(
     cols      = starts_with("R"),
     names_to  = c("responder", ".value"),
@@ -133,7 +154,6 @@ df_long <- combined_df %>%
   )
 
 # OL / HS label cols
-library(stringr)
 df_long <- df_long %>%
   mutate(
     OL = as.integer(str_detect(label, "(?<!N)OL")),
@@ -183,17 +203,16 @@ overall_HS <- final_summary %>%
 shot_order  <- c("zero-shot", "few-shot")
 group_order <- c("base", "conf", "batch", "batch_conf")
 
-# custom_order for the x-axis:
+### custom order
 tasks        <- c("A", "B", "C.OL", "C.HS")
 modes        <- c("", "_conf", "_batch", "_batch_conf")
 custom_order <- as.vector(outer(tasks, modes, paste0))
 
-# build long format df for plotting
+### build long format df for plot
 df_plot <- df_long %>%
-  # derive base_condition
+  # rename s.t. we have a base condition
   mutate(
     base_condition = word(condition, 1, sep = "_"),
-    # derive group_type
     group_type = case_when(
       !str_detect(condition, "_")            ~ "base",
       str_detect(condition, "_batch_conf$")  ~ "batch_conf",
@@ -202,13 +221,13 @@ df_plot <- df_long %>%
       TRUE                                   ~ "other"
     )
   ) %>%
-  # stack OL/HS into Measure/Value
+  # wide to long for OL and HS
   pivot_longer(
     cols      = c(OL, HS),
     names_to  = "Measure",
     values_to = "Value"
   ) %>%
-  # enforce factor ordering for plotting
+  # factor order for plots
   mutate(
     condition  = factor(condition,  levels = custom_order),
     group_type = factor(group_type, levels = group_order),
@@ -219,48 +238,29 @@ df_plot <- df_long %>%
   )
 
 
-df_prop <- df_long %>%
-  # derive base_condition + group_type as before
-  mutate(
-    base_condition = word(condition, 1, sep = "_"),
-    group_type = case_when(
-      !str_detect(condition, "_")           ~ "base",
-      str_detect(condition, "_batch_conf$") ~ "batch_conf",
-      str_detect(condition, "_conf$")       ~ "conf",
-      str_detect(condition, "_batch$")      ~ "batch",
-      TRUE                                  ~ "other"
-    )
-  ) %>%
-  # stack OL/HS into Measure/Value
-  pivot_longer(
-    cols      = c(OL, HS),
-    names_to  = "Measure",
-    values_to = "Value"
-  ) %>%
-  # compute the mean(Value) = proportion of 1’s per group
+### Compute the mean prevalences 
+df_prop <- df_plot %>%
   group_by(condition, group_type, shot, Measure) %>%
   summarise(
     Value = mean(Value, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  # enforce the same factor‐orders for plotting
-  mutate(
-    condition  = factor(condition,  levels = custom_order),
-    group_type = factor(group_type, levels = group_order),
-    shot       = factor(shot, levels = shot_order,
-                        labels = c("Proportion\n(zero-shot)",
-                                   "Proportion\n(few-shot)")),
-    Measure    = factor(Measure, levels = c("OL","HS"))
-  )
+    .groups = "drop")
 
-# grab the “overall” reference‐line values
 overall_OL <- final_summary %>% filter(version == "overall") %>% pull(OL)
 overall_HS <- final_summary %>% filter(version == "overall") %>% pull(HS)
 
-# ------------------------------------------------------------------
-# 2) now plot proportions in the same 2×4 faceted style
-# ------------------------------------------------------------------
-## ---- proportions plot with matching legend style --------------------------
+
+##### combine C.OL and C.HS conditions
+# remove the 'wrong rows'
+id_out_1 <- which(grepl("C\\.OL", df_prop$condition) & df_prop$Measure == "HS")
+id_out_2 <- which(grepl("C\\.HS", df_prop$condition) & df_prop$Measure == "OL")
+
+df_prop <- df_prop[-c(id_out_1, id_out_2), ]
+strip_pattern <- "\\.(?:OL|HS)"
+df_prop$condition <- str_remove_all(df_prop$condition, strip_pattern)
+
+
+
+### plot proportions in 2x4 panels
 ggplot(df_prop, aes(x = condition, y = Value, fill = Measure)) +
   geom_col(position = position_dodge(0.8), width = 0.7) +
   
@@ -274,7 +274,7 @@ ggplot(df_prop, aes(x = condition, y = Value, fill = Measure)) +
                  linetype   = "HS reference"),
              size = 0.8) +
   
-  ## facet layout differs from the first plot
+  ## facet layout 
   facet_grid(
     shot ~ group_type,
     scales = "free_x",
@@ -288,7 +288,7 @@ ggplot(df_prop, aes(x = condition, y = Value, fill = Measure)) +
     values = c(OL = "#1f77b4", HS = "#ff7f0e")
   ) +
   
-  ## reference-line legend (colour & linetype share labels)
+  ## reference line with same colors
   scale_colour_manual(
     name   = "Reference\n(Kern et al. (2023))",
     values = c("OL reference" = "#1f77b4",
@@ -300,14 +300,14 @@ ggplot(df_prop, aes(x = condition, y = Value, fill = Measure)) +
                "HS reference" = "dashed")
   ) +
   
-  ## keep the Measure legend above the Reference legend
+  ## measure legend above reference legend
   guides(
     fill      = guide_legend(order = 1),
     colour    = guide_legend(order = 2),
     linetype  = guide_legend(order = 2)
   ) +
   
-  ## y-axis: 0–1 with 0·25 ticks (same as first plot)
+  ## y axis labels
   scale_y_continuous(
     limits = c(0, 1),
     breaks = seq(0, 1, by = 0.25),
@@ -316,121 +316,122 @@ ggplot(df_prop, aes(x = condition, y = Value, fill = Measure)) +
   
   labs(
     x   = NULL,
-    y   = NULL          # you kept it blank here
+    y   = NULL          
   ) +
   
-  ## theme tweaks copied from the finished first plot
-  theme_bw(base_size = 14) +
+  ## theme 
+  theme_bw(base_size = 11) +                      
   theme(
-    axis.text.x          = element_text(angle = 90, vjust = 0.5, hjust = 1),
-    strip.placement      = "outside",
-    strip.background     = element_blank(),
+    axis.text.x        = element_text(size = 10, angle = 90,
+                                      vjust = 0.5, hjust = 1),
+    axis.text.y        = element_text(size = 10),
+    strip.placement    = "outside",
+    strip.background   = element_blank(),
+    strip.text         = element_text(size = 11, face = "bold"),
     
-    legend.position      = "right",
-    legend.box           = "vertical",
-    legend.text          = element_text(size = 13),
-    legend.title         = element_text(size = 13, face = "bold"),
-    legend.background    = element_rect(fill = "transparent", colour = "transparent"),
+    legend.position    = "right",
+    legend.box         = "vertical",
+    legend.text        = element_text(size = 10),
+    legend.title       = element_text(size = 10, face = "bold"),
+    legend.background  = element_rect(fill = "transparent",
+                                      colour = "transparent"),
     
-    panel.grid.major.x   = element_blank(),
-    panel.grid.minor     = element_blank()
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor   = element_blank()
   )
 
 
-# save
-ggsave("Plots/R/hs_ol_descr_x_zerofew.png", last_plot(),
-       dpi = 300,
-       width = 24, height = 10, units = "in")
+# save as pdf for good vector scaling
+ggsave(
+  "Plots/R/prevalences_zerofew_ABC.pdf",
+  plot   = last_plot(),
+  device = cairo_pdf,     
+  width  = 29,            # close to dina4
+  height = 17,             
+  units  = "cm"
+)
 
 
-#################
+
+################################################################################
 ### Same plot but only for few shot conditions
-#################
+################################################################################
 
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(stringr)
+# subset the few-shot rows
+df_prop_few <- df_prop %>% filter(grepl('few-shot', shot))
 
-# ------------------------------------------------------------------
-# 1) build a proportions table *only* for few-shot
-# ------------------------------------------------------------------
-df_prop_few <- df_long %>%
-  # derive base_condition + group_type as before
-  mutate(
-    base_condition = word(condition, 1, sep = "_"),
-    group_type = case_when(
-      !str_detect(condition, "_")           ~ "base",
-      str_detect(condition, "_batch_conf$") ~ "batch_conf",
-      str_detect(condition, "_conf$")       ~ "conf",
-      str_detect(condition, "_batch$")      ~ "batch",
-      TRUE                                  ~ "other"
-    )
-  ) %>%
-  # pivot OL/HS into Measure/Value
-  pivot_longer(
-    cols      = c(OL, HS),
-    names_to  = "Measure",
-    values_to = "Value"
-  ) %>%
-  # compute the mean(Value) = proportion of 1’s per cell
-  group_by(condition, group_type, shot, Measure) %>%
-  summarise(
-    Value = mean(Value, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  # keep only few-shot
-  filter(shot == "few-shot") %>%
-  # enforce your factor orders
-  mutate(
-    condition  = factor(condition,  levels = custom_order),
-    group_type = factor(group_type, levels = group_order),
-    Measure    = factor(Measure,    levels = c("OL","HS"))
-  )
 
-# grab overall reference‐line values
-overall_OL <- final_summary %>% filter(version == "overall") %>% pull(OL)
-overall_HS <- final_summary %>% filter(version == "overall") %>% pull(HS)
-
-# ------------------------------------------------------------------
-# 2) plot a 1×4 grid of just the few‐shot panels
-# ------------------------------------------------------------------
+### plot with reference legend 
 ggplot(df_prop_few, aes(x = condition, y = Value, fill = Measure)) +
   geom_col(position = position_dodge(0.8), width = 0.7) +
-  geom_hline(yintercept = overall_OL, linetype = "dashed", color = "#1f77b4") +
-  geom_hline(yintercept = overall_HS, linetype = "dashed", color = "#ff7f0e") +
-  facet_grid(
-    . ~ group_type,       # one row, columns = group_type
-    scales = "free_x", 
-    space  = "free_x"
+  
+  ## reference lines (Kern et al. 2023)
+  geom_hline(
+    aes(yintercept = overall_OL,
+        colour     = "OL reference",
+        linetype   = "OL reference"),
+    size = 0.8
   ) +
-  scale_fill_manual(values = c(OL = "#1f77b4", HS = "#ff7f0e")) +
+  geom_hline(
+    aes(yintercept = overall_HS,
+        colour     = "HS reference",
+        linetype   = "HS reference"),
+    size = 0.8
+  ) +
+  facet_grid(. ~ group_type, scales = "free_x", space = "free_x") +
+  ## actual bars
+  scale_fill_manual(
+    name   = "Measure",
+    values = c(OL = "#1f77b4", HS = "#ff7f0e")
+  ) +
+  ## rsame colors for reference
+  scale_colour_manual(
+    name   = "Reference\n(Kern et al. (2023))",
+    values = c("OL reference" = "#1f77b4",
+               "HS reference" = "#ff7f0e")
+  ) +
+  scale_linetype_manual(
+    name   = "Reference\n(Kern et al. (2023))",
+    values = c("OL reference" = "dashed",
+               "HS reference" = "dashed")
+  ) +
+  guides(
+    fill      = guide_legend(order = 1),   
+    colour    = guide_legend(order = 2),   
+    linetype  = guide_legend(order = 2)   
+  ) +
   scale_y_continuous(
     limits = c(0, 1),
     breaks = seq(0, 1, by = 0.25),
     labels = scales::percent_format(accuracy = 1)
   ) +
   labs(
-    x    = NULL,
-    y    = "Proportion\n(few-shot)",
-    fill = "Measure"
+    x = NULL,
+    y = "Proportion\n(few-shot)"
   ) +
   theme_bw(base_size = 14) +
   theme(
-    axis.text.x          = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    axis.text.x          = element_text(angle = 45, vjust = 1, hjust = 1),
     strip.placement      = "outside",
     strip.background     = element_blank(),
-    legend.position      = c(1, 1),
-    legend.justification = c(1, 1),
+    legend.position = 'right',
+    legend.box = 'vertical', 
+    legend.text = element_text(size = 13),
+    legend.title = element_text(size = 13, face = 'bold'),
+    legend.background    = element_rect(color = "transparent", fill = "transparent"),
     panel.grid.major.x   = element_blank(),
     panel.grid.minor     = element_blank()
   )
 
 
 # save
-# ggsave("Plots/hs_ol_descr_x_fewshot.png", last_plot(), 
-#        dpi = 300,
-#        width = 24, height = 10, units = "in")
+ggsave("Plots/R/prevalences_fewshot_ABC.pdf", 
+       last_plot(),
+       device = cairo_pdf,     
+       width  = 29,            # close to dina4
+       height = 17,             
+       units  = "cm"
+)
 
 
 
@@ -441,24 +442,7 @@ ggplot(df_prop_few, aes(x = condition, y = Value, fill = Measure)) +
 ### Calculate Rater Agreements 
 ################################################################################
 
-library(DescTools)  
-library(irr)       
-
-tweet_level_df <- df_long %>%
-  group_by(tweet_id, condition, shot, batch_id, tweet_in_batch) %>%
-  summarise(
-    label_count = n(),
-    HS_mode     = DescTools::Mode(HS),
-    HS_mean     = mean(HS, na.rm = TRUE),
-    HS_std      = sd(HS,   na.rm = TRUE),
-    OL_mode     = Mode(OL),
-    OL_mean     = mean(OL, na.rm = TRUE),
-    OL_std      = sd(OL,   na.rm = TRUE),
-    .groups = "drop"
-  )
-
-
-# 2) Aggregate modal ratings per tweet × condition × shot
+# get modal ratigs
 df_agg <- df_long %>%
   group_by(tweet_id, condition, shot) %>%
   summarise(
@@ -467,51 +451,52 @@ df_agg <- df_long %>%
     .groups = "drop"
   )
 
-# 3) Prepare lists of conditions
+# Prepare lists of conditions
 conditions    <- sort(unique(df_long$condition))
 HS_conditions <- conditions[!grepl("C\\.OL", conditions)]
 OL_conditions <- conditions[!grepl("C\\.HS", conditions)]
 
-# 4) Initialize empty agreement matrices
+# Setup empty agreement matrices
 across_HS_zero <- matrix(
-  NA_real_,
+  NaN,
   nrow = length(HS_conditions),
   ncol = length(HS_conditions),
   dimnames = list(HS_conditions, HS_conditions)
 )
 across_HS_few <- across_HS_zero
 across_OL_zero <- matrix(
-  NA_real_,
+  NaN,
   nrow = length(OL_conditions),
   ncol = length(OL_conditions),
   dimnames = list(OL_conditions, OL_conditions)
 )
 across_OL_few <- across_OL_zero
 
-# 5) Fill in diagonals (Fleiss' kappa) and off-diagonals (Cohen's kappa)
+# Fill in diagonals (Fleiss' kappa) and off-diagonals (Cohen's kappa)
 #  Diagonals: Average Within Tweet Agreement within Conditions 
 #             --> 3 Ratings per Tweet --> Fleiss Kappa
 #  Off-Diagonals: Average agreement of Modal Ratings per Tweet across
 #             --> 1 Modal Rating per Condition per Tweet --> Cohens Kappa
 for (shot_type in c("zero-shot", "few-shot")) {
   for (cond_i in conditions) {
-    # 5a) Fleiss' kappa for HS and OL in the same condition
+    # Fleiss' kappa for HS and OL in the same condition
     df_sub <- df_long %>% filter(shot == shot_type, condition == cond_i)
-    # get the matrix for HS ratings
-    mat_HS <- df_sub %>%
-      select(tweet_id, responder, HS) %>%
-      pivot_wider(names_from = responder, values_from = HS) %>%
-      select(-tweet_id) %>%
-      as.matrix()
-    # same for OL
+    # get the needed matrix for HS ratings for irr::kappam.fleiss
+    # OL
     mat_OL <- df_sub %>%
       select(tweet_id, responder, OL) %>%
       pivot_wider(names_from = responder, values_from = OL) %>%
       select(-tweet_id) %>%
       as.matrix()
-    # calculate fleiss kappa value for the current condition
-    kappa_fleiss_HS <- kappam.fleiss(mat_HS)$value
-    kappa_fleiss_OL <- kappam.fleiss(mat_OL)$value
+    # same for HS
+    mat_HS <- df_sub %>%
+      select(tweet_id, responder, HS) %>%
+      pivot_wider(names_from = responder, values_from = HS) %>%
+      select(-tweet_id) %>%
+      as.matrix()
+    # calculate kappa
+    kappa_fleiss_HS <- irr::kappam.fleiss(mat_HS)$value
+    kappa_fleiss_OL <- irr::kappam.fleiss(mat_OL)$value
     
     # assign kappa value to the appropriate matrix
     # zero shot
@@ -532,9 +517,25 @@ for (shot_type in c("zero-shot", "few-shot")) {
       }
     }
     
-    # 5b) Cohen's kappa between different conditions' modal ratings
+    # Cohen's kappa between different conditions' modal ratings
     for (cond_j in conditions) {
       if (cond_i != cond_j) {
+        # OL between-conditions
+        if (cond_i %in% OL_conditions && cond_j %in% OL_conditions) {
+          wide_OL <- df_agg %>%
+            filter(shot == shot_type, condition %in% OL_conditions) %>%
+            select(tweet_id, condition, modal_OL) %>%
+            pivot_wider(names_from = condition, values_from = modal_OL)
+          pair_ol <- wide_OL %>%
+            select(all_of(c(cond_i, cond_j))) %>%
+            drop_na()
+          kappa_pair_ol <-kappa2(pair_ol)$value 
+          if (shot_type=="zero-shot") {
+            across_OL_zero[cond_i, cond_j] <- kappa_pair_ol
+          } else {
+            across_OL_few[cond_i, cond_j]  <- kappa_pair_ol
+          }
+        }
         # HS between-conditions
         if (cond_i %in% HS_conditions && cond_j %in% HS_conditions) {
           # --> get the modal ratings per condition & tweet
@@ -554,36 +555,20 @@ for (shot_type in c("zero-shot", "few-shot")) {
             across_HS_few[cond_i, cond_j]  <- kappa_pair
           }
         }
-        # OL between-conditions
-        if (cond_i %in% OL_conditions && cond_j %in% OL_conditions) {
-          wide_OL <- df_agg %>%
-            filter(shot == shot_type, condition %in% OL_conditions) %>%
-            select(tweet_id, condition, modal_OL) %>%
-            pivot_wider(names_from = condition, values_from = modal_OL)
-          pair_ol <- wide_OL %>%
-            select(all_of(c(cond_i, cond_j))) %>%
-            drop_na()
-          kappa_pair_ol <-kappa2(pair_ol)$value 
-          if (shot_type=="zero-shot") {
-            across_OL_zero[cond_i, cond_j] <- kappa_pair_ol
-          } else {
-            across_OL_few[cond_i, cond_j]  <- kappa_pair_ol
-          }
-        }
       }
     }
   }
 }
 
-# Optionally convert to data-frames
+# convert to dfs
 across_HS_zero_df <- as.data.frame(across_HS_zero)
 across_HS_few_df  <- as.data.frame(across_HS_few)
 across_OL_zero_df <- as.data.frame(across_OL_zero)
 across_OL_few_df  <- as.data.frame(across_OL_few)
 
-# 6) Global vs. modal Cohen's kappa per condition x shot
-# --> calculcate modes for the kern reference data set
-global_modes <- tweets_full %>%
+### get Agreement rates with the Kern et al Reference Data set
+# --> calculcate modes for reference data set
+kern_modes <- tweets_full %>%
   group_by(tweet_id) %>%
   reframe(
     global_HS = Mode(hate_speech)[1], # select first if multiple modes
@@ -593,7 +578,7 @@ global_modes <- tweets_full %>%
   )
 
 df_agg2 <- df_agg %>%
-  left_join(global_modes, by = "tweet_id")
+  left_join(kern_modes, by = "tweet_id")
 
 outcomes <- c("HS","OL")
 shots    <- unique(df_agg2$shot)
@@ -620,15 +605,9 @@ for (outcome in outcomes) {
 kappa_results
 
 ################################################################################
-### Plot Agreements
+### Plot Agreements HeatMaps
 ################################################################################
-library(tidyverse)   
-library(stringr)
-library(patchwork)   
-library(RColorBrewer)
-library(data.table)
 
-# ── helpers ────────────────────────────────────────────────────────────────
 coolwarm <- colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdBu")))
 
 # prefixes / suffixes used for the ordering of conditions
@@ -644,29 +623,29 @@ build_panel_df <- function(outcome = c("OL", "HS"),
                            shot_code = c("zero", "few")) {
   
   outcome   <- match.arg(outcome)
-  shot_code <- match.arg(shot_code)     # "zero" or "few"
+  shot_code <- match.arg(shot_code)     
   
-  # 1) pull the right across-condition matrix ------------------------------
+  # select correct matrix
   mat <- get(paste0("across_", outcome, "_", shot_code))
   
-  # 2) drop the mismatching C.<other> rows/cols -----------------------------
+  # frop the 'wrong' C.OL and C.HS cols
   other_outcome <- ifelse(outcome == "HS", "OL", "HS")
   no_cond       <- paste0("C.", other_outcome)
   keep_rows     <- !str_detect(rownames(mat), fixed(no_cond))
   keep_cols     <- !str_detect(colnames(mat), fixed(no_cond))
   mat           <- mat[keep_rows, keep_cols, drop = FALSE]
   
-  # 3) strip the “.OL” / “.HS” endings -------------------------------------
+  # remove .OL / .HS 
   strip_pattern <- "\\.(?:OL|HS)"
   rownames(mat) <- str_remove_all(rownames(mat), strip_pattern)
   colnames(mat) <- str_remove_all(colnames(mat), strip_pattern)
   
-  # 4) enforce the desired ordering ----------------------------------------
+  # order
   cond_order <- base_cond_order[base_cond_order %in% rownames(mat)]
   mat        <- mat[cond_order, cond_order, drop = FALSE]
   mat_df <- as.data.frame(mat)
   
-  # 5) add the white “gap” and the Global column ---------------------------
+  # add gap col between agreements and kern agreements
   mat_df$gap <- NaN
   
   kappa_results_select <- kappa_results[[outcome]] 
@@ -689,7 +668,7 @@ build_panel_df <- function(outcome = c("OL", "HS"),
   rownames(mat_df) <- mat_df$Row.names    
   mat_df$Row.names <- NULL 
   
-  # 6) long format + upper-triangle mask -----------------------------------
+  # long format and only upper triangle
   df <- as_tibble(mat_df, rownames = "row_cond") |>
     pivot_longer(-row_cond,
                  names_to  = "col_cond",
@@ -698,25 +677,22 @@ build_panel_df <- function(outcome = c("OL", "HS"),
            shot    = factor(paste0(shot_code, "-shot"),
                             levels = c("zero-shot", "few-shot")))
   
-  # compute indices only for the condition block (not for gap / Global)
   cond_index <- setNames(seq_along(cond_order), cond_order)
   df <- df |>
     mutate(row_idx = cond_index[row_cond],
            col_idx = cond_index[col_cond],
-           # mask upper triangle of the condition block
            value   = ifelse(!is.na(row_idx) & !is.na(col_idx) &
-                              col_idx > row_idx, NA_real_, value)) |>
+                              col_idx > row_idx, NaN, value)) |>
     select(-row_idx, -col_idx)
   
-  df
+  return(df)
 }
 
-# ── build the full data-frame for the 4 panels ─────────────────────────────
-library(purrr)
-heat_df <- map_dfr(          # outer loop over outcomes
+#### build the plot data frames
+heat_df <- map_dfr(          # loop over outcomes
   c("OL", "HS"),
   function(o) {
-    map_dfr(                 # inner loop over shot types
+    map_dfr(                 # iloop over shot types
       c("zero", "few"),
       function(s) {
         build_panel_df(outcome = o, shot_code = s)
@@ -725,7 +701,6 @@ heat_df <- map_dfr(          # outer loop over outcomes
   }
 )
 
-# keep identical ordering across facets
 all_rows <- unique(heat_df$row_cond)
 all_cols <- unique(heat_df$col_cond)
 
@@ -733,39 +708,70 @@ heat_df <- heat_df |>
   mutate(row_cond = factor(row_cond, levels = all_rows),
          col_cond = factor(col_cond, levels = all_cols))
 
-# ── ggplot heat-maps with facets ───────────────────────────────────────────
+
+# change the condition names
+heat_df <- heat_df %>% 
+  mutate(
+    outcome  = factor(outcome, levels = c("OL", "HS")), # cols
+    shot     = factor(shot,    levels = c("zero-shot",
+                                          "few-shot")), # rows
+    condition = factor(
+      paste(outcome, shot, sep = " | "),
+      levels = c("OL | zero-shot", "HS | zero-shot",
+                 "OL | few-shot",  "HS | few-shot")     # order
+    )
+  )
+
+### plot
 ggplot(heat_df,
-            aes(x = col_cond, y = row_cond, fill = value)) +
-  geom_tile(colour = "white", linewidth = 0.5) +
-  geom_text(aes(label = ifelse(is.na(value), "", sprintf("%.2f", value))),
-            size = 3) +
-  scale_y_discrete(limits = rev) + 
+       aes(x = col_cond, y = row_cond, fill = value)) +
+  geom_tile(colour = "white", linewidth = 0.4) +              
+  geom_text(aes(label = ifelse(is.na(value), "", 
+                               sub("^(-?)0\\.", "\\1.", sprintf("%.2f", value))
+                               )),
+            size = 3.5) +                                      
+  scale_y_discrete(limits = rev) +
   scale_x_discrete(
-    labels = function(x) ifelse(x == "gap", "", 
-                                ifelse(x == 'reference_agreement',
-                                       'Reference',x))) +
-  scale_fill_gradientn(
-    colours   = coolwarm(100),
-    limits    = c(0, 1),
-    na.value  = "white",
-    name      = "Kappa\n(Cohen's /\nFleiss')"
+    labels = function(x) ifelse(x == "gap", "",  # blank gap
+                                ifelse(x == "reference_agreement",
+                                       "Reference", x))
   ) +
-  facet_grid(outcome ~ shot, switch = "both") +
-  theme_minimal(base_size = 14) +
+  scale_fill_gradientn(
+    colours  = coolwarm(100),
+    limits   = c(0, 1),
+    na.value = "white",
+    name     = "Kappa\n(Cohen's\nor\nFleiss')"
+  ) +
+  facet_wrap(~ condition, ncol = 2, strip.position = "top") +
+  theme_minimal(base_size = 11) +                             
   theme(
     panel.grid      = element_blank(),
-    axis.text.x     = element_text(angle = 45, hjust = 1),
+    axis.text.x     = element_text(size = 11, angle = 90, hjust = 1),
+    axis.text.y     = element_text(size = 11),
     axis.title      = element_blank(),
-    strip.text      = element_text(size = 14)
-  ) +
-  labs(title = "Agreement Across Conditions")
+    strip.text      = element_text(size = 11, face = "bold"),
+    legend.title    = element_text(size = 11, face = "bold"),
+    legend.text     = element_text(size = 11),
+    plot.title      = element_text(size = 11, face = "bold", hjust = .5),
+  ) 
+
+
+# save as pdf for good vector scaling
+ggsave(
+  "Plots/R/agreements.pdf",
+  plot   = last_plot(),
+  device = cairo_pdf,     
+  width  = 29,            # close to dina4
+  height = 17,             
+  units  = "cm"
+)
 
 
 ################################################################################
 ### Inspect some of the low Agreement Cases
 ################################################################################
 
-## ── 1) LLM label data (few-shot only) ────────────────────────────────────────
+## LLM labeks
 llm_labels_reshaped <- df_long %>% 
   filter(shot == "few-shot") %>% 
   group_by(tweet_id, condition, .drop = FALSE) %>% 
@@ -775,7 +781,7 @@ llm_labels_reshaped <- df_long %>%
     .groups     = "drop"
   )
 
-## ── 2) Human (Kern) label data ───────────────────────────────────────────────
+## Human labels
 tweets_kern_reshaped <- tweets_full %>% 
   group_by(tweet_id, .drop = FALSE) %>% 
   summarise(
@@ -784,27 +790,27 @@ tweets_kern_reshaped <- tweets_full %>%
     .groups       = "drop"
   )
 
-## ── 3) tweet text (hashed) ───────────────────────────────────────────────────
+## actual tweets
 tweets_text <- tweets_full %>% 
   distinct(tweet_id, tweet_hashed)
 
-## ── 4) merge the three tables ────────────────────────────────────────────────
+## combine dfs
 merged <- llm_labels_reshaped %>% 
-  inner_join(tweets_kern_reshaped, by = "tweet_id") %>%   # LLM ↔︎ human
-  left_join(tweets_text,         by = "tweet_id")         # add text
+  inner_join(tweets_kern_reshaped, by = "tweet_id") %>%  
+  left_join(tweets_text,         by = "tweet_id")         
 
-## ── 5) absolute differences & sample 10 rows ────────────────────────────────
+## get the differences between labels 
 merged <- merged %>% 
   mutate(
     mean_diff_OL = abs(mean_OL_human - mean_OL_llm),
     mean_diff_HS = abs(mean_HS_human - mean_HS_llm)
   )
 
-set.seed(15)  # reproducible like random_state=13
+set.seed(15)  # random subset of tweets
 sample_10 <- merged %>% 
   filter(
     mean_diff_OL > 0.5,
-    !str_detect(condition, "^C\\.HS")      # drop bare C.HS controls
+    !str_detect(condition, "^C\\.HS")     
   ) %>% 
   slice_sample(n = 10)
 
@@ -831,7 +837,7 @@ df_long <- df_long %>%
   )
 
 # GLMM for OL
-library(lme4)
+
 colnames(df_long)
 model_OL <- glmer(OL ~ 1 + task + batch + conf + (1 | tweet_id),
                   data = df_long[!grepl('C.HS', df_long$condition) , ],
