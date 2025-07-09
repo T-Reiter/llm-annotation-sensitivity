@@ -27,24 +27,6 @@ rm(list = ls())
 ### Load and RBind the GPT Labelled Tweets
 ################################################################################
 
-# zero shot (older and smaller sample size --> only used during initial expl.)
-date_to_import_z <- "2025_04_10"
-files_z <- list.files(
-  path = "Data_Collection/",
-  pattern = paste0("^", date_to_import_z),
-  full.names = TRUE
-)
-
-combined_df_z <- files_z %>%
-  map_df(read_csv, .id = "source") %>%     
-  arrange(batch_id, tweet_in_batch) %>%
-  mutate(shot = "zero-shot") %>%
-  select(1:4, shot, everything())
-
-combined_df_z$R1_score <- as.character(combined_df_z$R1_score)
-combined_df_z$R2_score <- as.character(combined_df_z$R2_score)
-combined_df_z$R3_score <- as.character(combined_df_z$R3_score)
-
 # few shot (main sample)
 date_to_import_f <- "2025_07_01"
 files_f <- list.files(
@@ -53,14 +35,12 @@ files_f <- list.files(
   full.names = TRUE
 )
 
-combined_df_f <- files_f %>%
+combined_df <- files_f %>%
   map_df(read_csv, .id = "source") %>%
   arrange(batch_id, tweet_in_batch) %>%
   mutate(shot = "few-shot") %>%
   select(1:4, shot, everything())
 
-
-combined_df <- bind_rows(combined_df_z, combined_df_f)
 
 n_tweets        <- combined_df %>% pull(tweet_id) %>% unique() %>% length()
 n_tweet_batches <- combined_df %>% pull(batch_id)   %>% unique() %>% length()
@@ -119,6 +99,7 @@ df_long <- df_long %>%
 
 # GLMM for OL
 library(lme4)
+library(broom.mixed)
 colnames(df_long)
 model_OL <- glmer(OL ~ 1 + task + batch + conf + (1 | tweet_id),
                   data = df_long[!grepl('C.HS', df_long$condition) , ],
@@ -126,10 +107,22 @@ model_OL <- glmer(OL ~ 1 + task + batch + conf + (1 | tweet_id),
                   , control = glmerControl(optimizer = "bobyqa")
                   )
 summary(model_OL)
+options(scipen = 9)
+tidy(model_OL,conf.int=TRUE,exponentiate=FALSE,effects="fixed") %>% 
+  mutate(across(
+    .cols = where(is.numeric),
+    .fns  = ~ round(.x, 3))) |> 
+  as.data.frame() |> print()
 # lower prob for OL in task B and C 
 #     --> in B: OL is asked second
 # lower prob for B in batch
 # higher prob when asking for confidence 
+
+tab_model(model_OL,                 # get the table for the paper 
+          transform = NULL,         # betas 
+          show.intercept = FALSE)   # no intercept term
+
+
 
 # GLMM for HS
 model_HS <- glmer(HS ~ 1 + task + batch + conf + (1 | tweet_id),
@@ -139,13 +132,23 @@ model_HS <- glmer(HS ~ 1 + task + batch + conf + (1 | tweet_id),
 )
 
 summary(model_HS)
+
+tidy(model_HS,conf.int=TRUE,exponentiate=FALSE,effects="fixed") %>% 
+  mutate(across(
+    .cols = where(is.numeric),
+    .fns  = ~ round(.x, 3))) |> 
+  as.data.frame() |> print()
+
+
 # higher prob for HS in task B and C
 #     --> in B: HS is asked first
 # lower prob for B in batch
 # higher prob when asking for confidence 
 
 
-
+tab_model(model_HS,                 # get the table for the paper 
+          transform = NULL,         # betas 
+          show.intercept = FALSE)   # no intercept term
 
 
 
