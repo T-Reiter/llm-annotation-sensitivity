@@ -1,8 +1,35 @@
-library(tidyverse)
+################################################################################
+### Pre-Req
+################################################################################
 
-# read labels 
-rm(list = ls())
+### load packages
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(DescTools)  
+library(irr)  
+library(tidyverse)   
+library(patchwork)   
+library(RColorBrewer)
+library(data.table)
+library(purrr)
+library(lme4)
+library(readr)
+library(tibble)        
+library(psych)         
+
+
+### Set WD and clear environment
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # wd = source loc
+rm(list = ls())
+
+
+################################################################################
+### Load, RBind, and restructure the GPT Labelled Tweets
+################################################################################
+
 csv_paths <- list.files("Data_Collection/OL_NH", 
                         pattern = "\\.csv$", full.names = TRUE)
 csv_paths <- csv_paths[grepl('2025_07_01', csv_paths)]
@@ -13,18 +40,17 @@ length(unique(all_data$tweet_id))
 length(unique(all_data$batch_id))
 sum(duplicated(all_data))
 
-# batch_data <- all_data %>% filter(grepl('batch', condition))
+# add few shot col
 all_data$shot = 'few-shot'
 
-## vector that defines the column set we’ll need again later -----------
+## cond_clean col
 all_data$cond_clean <- gsub("\\.(OL|HS)", "", all_data$condition)
 
 
 ################################################################################
-### CERTAINTY METRIC 1: SELF-REPORTED CONFIDENCE SCORES (CONF CONDITIONS)
+###' *CERTAINTY METRIC 1: SELF-REPORTED CONFIDENCE SCORES*
+### --> confidence conditions only
 ################################################################################
-
-library(readr)
 
 confidence_df <- all_data %>% filter(grepl('conf', condition))
 
@@ -85,34 +111,22 @@ for (row in 1:nrow(confidence_df)){
 }
 
 
-# Correctly match the confidences in A&B and melt the c conditions --------
-library(dplyr)
-library(stringr)
-library(purrr)
-
-
-
-
+### Correctly match confidences in A&B and melt the c conditions 
 key_cols <- c("batch_id", "tweet_in_batch", "tweet_id",
               "tweet", "condition", "shot",
               "R1_label", "R2_label", "R3_label",
               "R1_score", "R2_score", "R3_score",
               "cond_clean")
 
-## ------------------------------------------------------------------ ##
-## 2. derive OL / HS *confidence* columns --------------------------- ##
-## ------------------------------------------------------------------ ##
-# helper →  TRUE ⇢ OL is first element (index 1);  FALSE ⇢ OL is second
+## OL / HS confidence column --> where is OL the first value --> A& C.OL
 ol_first <- with(confidence_df,
-                 str_detect(condition, "A")     |             # A
-                   str_detect(condition, "C\\.OL"))             # C.OL
+                 str_detect(condition, "A")     |       # A
+                   str_detect(condition, "C\\.OL"))     # C.OL
 
 
-## ------------------------------------------------------------------ ##
-## 3. build the A/B block (nothing special) ------------------------- ##
-## ------------------------------------------------------------------ ##
+## Build AB confidences (straightforaward)
 confidence_df_A_B <- confidence_df %>%
-  filter(str_detect(condition, "[AB]")) %>%                # keep A or B
+  filter(str_detect(condition, "[AB]")) %>%   # match A or B
   select(all_of(key_cols)) 
 
 confidence_df_A_B <- merge(
@@ -125,11 +139,10 @@ confidence_df_A_B <- merge(
                     paste0("R", c(1,2,3), "_HS_confidence"))],
   on = c('tweet_id', 'cond_clean'))
 
-## ------------------------------------------------------------------ ##
-## 4. build the C block (merge C.OL and C.HS) ----------------------- ##
-## ------------------------------------------------------------------ ##
+## Build C Block (always combine the C.HS and C.OL rwos per tweet x condition)
+# C.OL
 confidence_df_C.OL <- confidence_df %>%
-  filter(grepl("C.OL", condition)) %>%                # keep A or B
+  filter(grepl("C.OL", condition)) %>%              
   select(all_of(c(key_cols,
                   "R1_OL", "R2_OL", "R3_OL",
                   "conf_R1", "conf_R2", "conf_R3",
@@ -138,9 +151,9 @@ colnames(confidence_df_C.OL)[which(colnames(confidence_df_C.OL) %in%
                                      c("conf_R1", "conf_R2", "conf_R3"))] <- 
   c(paste0(c("conf_R1", "conf_R2", "conf_R3"),'_OL'))
   
-
+# C.HS
 confidence_df_C.HS <- confidence_df %>%
-  filter(grepl("C.HS", condition)) %>%                # keep A or B
+  filter(grepl("C.HS", condition)) %>%               
   select(all_of(c(key_cols,
                   "R1_HS", "R2_HS", "R3_HS",
                   "conf_R1", "conf_R2", "conf_R3",
@@ -160,9 +173,7 @@ confidence_df_C <- merge(
 
 
 
-## ------------------------------------------------------------------ ##
-## 5. final combined data frame ------------------------------------- ##
-## ------------------------------------------------------------------ ##
+## Combine final confidence df
 confidence_df_final <- bind_rows(confidence_df_A_B, confidence_df_C)
 confidence_df_final$R1_OL_confidence <- as.numeric(confidence_df_final$R1_OL_confidence)
 confidence_df_final$R2_OL_confidence <- as.numeric(confidence_df_final$R2_OL_confidence)
@@ -171,13 +182,14 @@ confidence_df_final$R1_HS_confidence <- as.numeric(confidence_df_final$R1_HS_con
 confidence_df_final$R2_HS_confidence <- as.numeric(confidence_df_final$R2_HS_confidence)
 confidence_df_final$R3_HS_confidence <- as.numeric(confidence_df_final$R3_HS_confidence)
 
-## quick sanity checks (rows similar to the Python prints) ------------
-cat("NRows A and B conditions :", nrow(confidence_df_A_B), "\n")
-cat("NRows C conditions       :", nrow(confidence_df_C),   "\n")
-cat("NRows total              :", nrow(confidence_df_final), "\n")
+## sanity checks
+# cat("NRows A and B conditions :", nrow(confidence_df_A_B), "\n")
+# cat("NRows C conditions       :", nrow(confidence_df_C),   "\n")
+# cat("NRows total              :", nrow(confidence_df_final), "\n")
 
 
-# Plot the average certainties per condition 
+###############
+######## Plot the average certainties per condition 
 confidence_df_final['mean_tweet_conf_OL'] <- 
   rowMeans(confidence_df_final[, paste0('R', c(1,2,3), '_OL_confidence')])
 confidence_df_final['mean_tweet_conf_HS'] <- 
@@ -192,10 +204,6 @@ mean_confidence_wide <- confidence_df_final %>%
     .groups = "drop"
   )
 
-
-
-library(ggplot2)
-
 # Define color palette
 palette <- c("OL" = "#1f77b4", "HS" = "#ff7f0e")
 
@@ -206,14 +214,14 @@ normal_conditions <- mean_confidence_wide %>%
 batch_conditions <- mean_confidence_wide %>%
   filter(str_detect(cond_clean, "_batch_conf"))
 
-# Sort conditions alphabetically
+# Sort conditions alphabetically (A,B,C)
 normal_conditions <- normal_conditions %>% arrange(cond_clean)
 batch_conditions <- batch_conditions %>% arrange(cond_clean)
 
 # Concatenate for ordered display
 ordered_df <- bind_rows(normal_conditions, batch_conditions)
 
-# Convert to long format for ggplot
+# wide to long
 long_df <- ordered_df %>%
   pivot_longer(
     cols = c(mean_confidence_OL, mean_confidence_HS),
@@ -231,32 +239,42 @@ ggplot(long_df, aes(x = cond_clean, y = mean_confidence, fill = group)) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~ group, ncol = 2, scales = "fixed") +
   scale_fill_manual(values = palette) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme_minimal(base_size = 16) +
+  theme(
+    axis.title.x  = element_text(size = 18, face = "bold"),
+    axis.title.y  = element_text(size = 18, face = "bold"),
+    axis.text.x   = element_text(angle = 45, hjust = 1, size = 14),
+    axis.text.y   = element_text(size = 14),
+    strip.text    = element_text(size = 16, face = "bold"),
+    plot.margin   = margin(10, 10, 10, 10)
+  ) +
   labs(
     x = NULL,
-    y = "Mean Confidence",
+    y = "Mean LLM-reported Confidence"
     # title = "Confidence by Condition and Group"
   ) +
   coord_cartesian(ylim = c(70, 100))
 
 
-ggsave("Plots/R/certainty_selfreport.png", last_plot(),
-       dpi = 300,
-       width = 24, height = 10, units = "in")
+ggsave("Plots/R/certainty_selfreport.pdf",
+       last_plot(),
+       device = cairo_pdf,     
+       width  = 20,            # close to dina4
+       height = 13,             
+       units  = "cm"
+)
 
 
 ################################################################################
-### CERTAINTY METRIC 2: (EMPIRICAL) ENTROPY 
+###' *CERTAINTY METRIC 2: (EMPIRICAL) ENTROPY*
+### --> for all conditions
 ################################################################################
 
 key_cols <- c("batch_id", "tweet_in_batch", "tweet_id",
               "tweet", "condition", "shot",
               "cond_clean")
 
-
 entropy_df <- all_data
-
 
 entropy_df <- entropy_df %>%
   mutate(
@@ -270,8 +288,9 @@ entropy_df <- entropy_df %>%
 
 
 
+## combine A&B and C conditions again
 entropy_df_A_B <- entropy_df %>%
-  filter(str_detect(condition, "[AB]")) %>%                # keep A or B
+  filter(str_detect(condition, "[AB]")) %>%                
   select(all_of(key_cols)) 
 
 entropy_df_A_B <- merge(
@@ -283,17 +302,16 @@ entropy_df_A_B <- merge(
 
 
 
-
-## ------------------------------------------------------------------ ##
-## 4. build the C block (merge C.OL and C.HS) ----------------------- ##
-## ------------------------------------------------------------------ ##
+## Buil the C data frame
+# C.OL
 entropy_df_C.OL <- entropy_df %>%
-  filter(grepl("C.OL", condition)) %>%                # keep A or B
+  filter(grepl("C.OL", condition)) %>%                
   select(all_of(c(key_cols,
                   "R1_OL", "R2_OL", "R3_OL")))
 
+# C.HS
 entropy_df_C.HS <- entropy_df %>%
-  filter(grepl("C.HS", condition)) %>%                # keep A or B
+  filter(grepl("C.HS", condition)) %>%                
   select(all_of(c(key_cols,
                   "R1_HS", "R2_HS", "R3_HS")))
 
@@ -309,22 +327,26 @@ entropy_df_C <- merge(
 entropy_df_full <- rbind(entropy_df_A_B, entropy_df_C)
 
 
-# Define a function to compute binary Shannon entropy
+# Function for binary shannon entropy
 shannon_entropy <- function(p) {
-  # Handle edge cases (p = 0 or 1) to avoid NaNs
+  # basic formula (with base 2)
   entropy <- -p * log2(p) - (1 - p) * log2(1 - p)
-  entropy[is.nan(entropy)] <- 0  # 0 log 0 is defined as 0 in information theory
-  return(entropy)
+  # handle NaN case (i.e., entropy if 111 or 000)
+  entropy[is.nan(entropy)] <- 0  
+  return(entropy) # entropy unit are shannons (base 2)
 }
 
-# Compute proportion of 1s for each outcome
-entropy_df_full$p_OL <- rowMeans(entropy_df_full[, paste0('R', c(1,2,3), '_OL')])
-entropy_df_full$p_HS <- rowMeans(entropy_df_full[, paste0('R', c(1,2,3), '_HS')])
+# Compute proportion (p) of 1s per OL/HS
+entropy_df_full$p_OL <- 
+  rowMeans(entropy_df_full[, paste0('R', c(1,2,3), '_OL')])
+entropy_df_full$p_HS <- 
+  rowMeans(entropy_df_full[, paste0('R', c(1,2,3), '_HS')])
 
-# Apply entropy function
+# calculate entropy
 entropy_df_full$tweet_entropy_OL <- shannon_entropy(entropy_df_full$p_OL)
 entropy_df_full$tweet_entropy_HS <- shannon_entropy(entropy_df_full$p_HS)
 
+# avg entropies per cond x outcome
 mean_entropy_wide <- entropy_df_full %>%
   group_by(cond_clean) %>%
   summarise(
@@ -334,26 +356,18 @@ mean_entropy_wide <- entropy_df_full %>%
   )
 
 
-# Plot
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-
-# Define color palette
-palette <- c("OL" = "#1f77b4", "HS" = "#ff7f0e")
-
-# Define condition order (same as in Python)
+# order for plotting
 condition_order <- c(
   'A', 'A_conf', 'A_batch', 'A_batch_conf',
   'B', 'B_conf', 'B_batch', 'B_batch_conf',
   'C', 'C_conf', 'C_batch', 'C_batch_conf'
 )
 
-# Make sure cond_clean follows the correct order
+# cond_ckean order
 mean_entropy_wide <- mean_entropy_wide %>%
   mutate(cond_clean = factor(cond_clean, levels = condition_order))
 
-# Convert to long format for ggplot
+# wide to long
 mean_entropy_long <- mean_entropy_wide %>%
   pivot_longer(
     cols = c(mean_entropy_OL, mean_entropy_HS),
@@ -364,30 +378,43 @@ mean_entropy_long <- mean_entropy_wide %>%
   mutate(group = factor(group, levels = c("OL", "HS")))
 
 # Plot
-ggplot(mean_entropy_long, aes(x = cond_clean, y = mean_entropy, fill = group)) +
+palette <- c("OL" = "#1f77b4", "HS" = "#ff7f0e")
+
+ggplot(mean_entropy_long, 
+       aes(x = cond_clean, y = mean_entropy, fill = group)) +
   geom_col(show.legend = FALSE) +
   facet_wrap(~ group, ncol = 2, scales = "fixed") +
   scale_fill_manual(values = palette) +
-  theme_minimal() +
+  theme_minimal(base_size = 16) +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    axis.title.x  = element_text(size = 18, face = "bold"),
+    axis.title.y  = element_text(size = 18, face = "bold"),
+    axis.text.x   = element_text(angle = 45, hjust = 1, size = 14),
+    axis.text.y   = element_text(size = 14),
+    strip.text    = element_text(size = 16, face = "bold"),
+    plot.margin   = margin(10, 10, 10, 10)
   ) +
   labs(
     x = NULL,
-    y = "Mean entropy (bits)",
+    y = "Mean entropy",
     # title = "Mean Entropy by Condition and Group"
   )
 
 
 
-ggsave("Plots/R/certainty_entropy.png", last_plot(),
-       dpi = 300,
-       width = 24, height = 10, units = "in")
+ggsave("Plots/R/certainty_entropy.pdf", 
+       last_plot(),
+       device = cairo_pdf,     
+       width  = 20,            # close to dina4
+       height = 13,             
+       units  = "cm"
+)
 
 
 
 ################################################################################
-### CERTAINTY METRIC 3: TOP2-TOKEN-LOGPROB DISPARITY
+###' *CERTAINTY METRIC 3: TOP2-TOKEN-LOGPROB DISPARITY*
+### --> only non batch conditions
 ################################################################################
 
 logprob_conditions <- c('A', 'B', 'C.OL', 'C.HS',
@@ -409,13 +436,9 @@ logprob_df <- logprob_df %>%
     R3_HS = as.integer(str_detect(R3_label, "(?<!N)HS")),
   )
 
-library(dplyr)
-library(purrr)
 
-# ---- prerequisites ----
-# logprob_df  # your original (wide) data frame
-# Make sure the rater-specific columns exist, e.g. "R1_label", "R1_score", …
 
+# logprob df
 ID_VARS <- c("batch_id", "tweet_in_batch", "tweet_id",
              "tweet", "condition", "shot", 'cond_clean', 
              paste0('R', c(1,2,3), '_label'),
@@ -426,7 +449,7 @@ ID_VARS <- c("batch_id", "tweet_in_batch", "tweet_id",
 
 raters <- c("R1", "R2", "R3")
 
-# ---- build long data frame ----
+# get long df witht the different rows for raters
 long_df <- map_dfr(raters, function(r) {
   logprob_df %>%
     select(all_of(ID_VARS)) %>%            # keep identifier columns
@@ -446,36 +469,36 @@ long_df <- map_dfr(raters, function(r) {
 long_df <- long_df %>%
   mutate(across(starts_with("Token"), ~ as.character(.))) %>%
   mutate(
-    # ----- OL tokens -----
+    # OL: get the OL tokens from the respective position per condition
     OL_top5_logprobs = case_when(
-      condition %in% c("A", "A_conf", "C.OL", "C.OL_conf") ~ Token1,
-      condition == "B"                                      ~ Token3,
-      condition == "B_conf"                                 ~ Token4,
-      TRUE                                                  ~ NA
+      condition %in% c("A", "A_conf", 
+                       "C.OL", "C.OL_conf") ~ Token1, # Ol first
+      condition == "B"                      ~ Token3, # OL sec
+      condition == "B_conf"                 ~ Token4, # Ol sec
+      TRUE                                  ~ NA
     ),
     
-    # ----- HS tokens -----
+    # same for HS
     HS_top5_logprobs = case_when(
-      condition == "A"              ~ Token3,
-      condition == "A_conf"         ~ Token4,
+      condition == "A"                      ~ Token3, # HS second
+      condition == "A_conf"                 ~ Token4, # HS second w/ score 
       condition %in% c("B", "B_conf",
-                       "C.HS", "C.HS_conf") ~ Token1,
+                       "C.HS", "C.HS_conf") ~ Token1, # HS first
       TRUE                                  ~ NA
     )
   )
 
 
-library(stringr)
 
-## 1️⃣  Regex pattern ------------------------------------------
-# Same semantics as the Python LOGPAT
-# --> turn logprob cell into ordered list of tokens!
+## Turn the messy logprob cell into ordered list
 LOGPAT <- regex(
   "^(?<tok>.*?)\\s+(?<logp>[-+]?(?:\\d*\\.\\d+|\\d+)(?:e[-+]?\\d+)?)\\s*$",
+  # --> matches: tok (= token) --> the character token
+  #              logp (= logprob) --> the number afterwards
   ignore_case = TRUE
 )
 
-## 2️⃣  Helper --------------------------------------------------
+# function using the regex
 to_list <- function(cell) {
   # Silently return empty list on NA / non-string inputs
   if (!is.character(cell) || is.na(cell)) return(list())
@@ -494,7 +517,7 @@ to_list <- function(cell) {
   }) %>% compact()            # drop NULLs
 }
 
-## 3️⃣  Apply row-wise ------------------------------------------
+# use function
 long_df <- long_df %>%
   mutate(
     OL_top5_list = map(OL_top5_logprobs, to_list),
@@ -502,20 +525,17 @@ long_df <- long_df %>%
   )
 
 
-library(dplyr)
-library(purrr)
-
-# helper -----------------------------------------------------------------
+# extract the first logprob for each logprob list 
 first_logp <- function(x) {
-  # x is one element of OL_top5_list / HS_top5_list (itself a list)
+  # x is one element of OL_top5_list / HS_top5_list 
   if (length(x) >= 1 && !is.null(x[[1]]$logp)) {
-    x[[1]]$logp          # numeric value
+    x[[1]]$logp          
   } else {
-    NA_real_
+    NaN
   }
 }
 
-# main -------------------------------------------------------------------
+# get logprobs for the first token
 long_df <- long_df %>%
   mutate(
     # 1. grab first log-prob (or NA) ----
@@ -527,13 +547,8 @@ long_df <- long_df %>%
     HS_first_token_prob    = exp(HS_first_token_logprob)
   )
 
-# optional: nicer printing
-options(digits = 10)
 
-# Plot Probs and Logprobs
-library(ggplot2)
-library(patchwork)   # install.packages("patchwork") if needed
-
+### Plot Probs and Logprobs --> not used in the manuscript
 # same colours as your Matplotlib palette
 pal <- c(OL = "#1f77b4", HS = "#ff7f0e")
 
@@ -557,13 +572,13 @@ p4 <- ggplot(long_df, aes(HS_first_token_prob)) +
   labs(title = "HS – p", x = "probability", y = "Count") +
   theme_minimal()
 
-# 2×2 layout – same as plt.subplots(2, 2, …)
+# patchwork plot
 (p1 | p2) / (p3 | p4)
 
 
 
-#### Calculate Top2-Token Disparity Ratings
-#--- helpers ---------------------------------------------------------------
+####' *Calculate Top2-Token Disparity Ratings*
+# get first and second token logprob
 first_logp  <- function(x) {
   if (length(x) >= 1 && !is.null(x[[1]]$logp)) x[[1]]$logp else NA_real_
 }
@@ -571,37 +586,33 @@ second_logp <- function(x) {
   if (length(x) >= 2 && !is.null(x[[2]]$logp)) x[[2]]$logp else NA_real_
 }
 
-#--- main ------------------------------------------------------------------
+# get the logprobs in the df
 long_df <- long_df %>%
   mutate(
-    # 1️⃣  first-listed log-probs
+    # first LOGPROBS
     OL_first_token_logprob = map_dbl(OL_top5_list, first_logp),
     HS_first_token_logprob = map_dbl(HS_top5_list, first_logp),
     
-    # 2️⃣  second-listed log-probs
+    # second LOGPROBS
     OL_second_token_logprob = map_dbl(OL_top5_list, second_logp),
     HS_second_token_logprob = map_dbl(HS_top5_list, second_logp),
     
-    # 3️⃣  probabilities (exp)
+    # get the PROBS
     OL_first_token_prob  = exp(OL_first_token_logprob),
     HS_first_token_prob  = exp(HS_first_token_logprob),
     OL_second_token_prob = exp(OL_second_token_logprob),
     HS_second_token_prob = exp(HS_second_token_logprob)
   )
 
-# nicer printing (like pandas' display.float_format)
-options(digits = 10)
 
-# top 2 Token Disparity
+# top 2 Token Disparity log(1) - log(2)
 long_df$top2_token_disparity_OL <- 
   long_df$OL_first_token_logprob - long_df$OL_second_token_logprob
 long_df$top2_token_disparity_HS <- 
   long_df$HS_first_token_logprob - long_df$HS_second_token_logprob
 
 
-
-# Combine the values for the C.OL and C.HS conditions 
-# ── 1. base disparity_df --------------------------------------------------
+# Combine the C disparities
 disparity_df <- long_df %>%
   select(
     batch_id, tweet_in_batch, tweet_id, tweet,
@@ -613,17 +624,17 @@ disparity_df <- long_df %>%
 key_cols <- c("batch_id", "tweet_in_batch", "tweet_id",
               "tweet", "condition", "shot", "Rater", "cond_clean")
 
-# ── 2. conditions A & B ---------------------------------------------------
+# AB
 disparity_df_A_B <- disparity_df %>%
-  filter(str_detect(condition, "[AB]"))   # matches 'A', 'B', 'A_conf', ...
+  filter(str_detect(condition, "[AB]"))   
 
-# ── 3. C-conditions: start with unique tweet×cond×rater rows --------------
+# C conds merge 
 disparity_df_C <- disparity_df %>%
   filter(grepl('C', condition)) %>%
   select(all_of(key_cols)) %>%
   distinct(tweet_id, cond_clean, Rater, .keep_all = TRUE)
 
-# ---- 3a. join OL ratings -------------------------------------------------
+# C.OL
 C_OL <- disparity_df %>%
   filter(str_detect(condition, "C\\.OL")) %>%
   select(tweet, tweet_id, cond_clean, Rater,
@@ -632,7 +643,7 @@ C_OL <- disparity_df %>%
 disparity_df_C <- disparity_df_C %>%
   left_join(C_OL, by = c("tweet","tweet_id", "cond_clean", "Rater"))
 
-# ---- 3b. join HS ratings -------------------------------------------------
+# -C.HS
 C_HS <- disparity_df %>%
   filter(str_detect(condition, "C\\.HS")) %>%
   select(tweet, tweet_id, cond_clean, Rater,
@@ -641,53 +652,55 @@ C_HS <- disparity_df %>%
 disparity_df_C <- disparity_df_C %>%
   left_join(C_HS, by = c("tweet","tweet_id", "cond_clean", "Rater"))
 
-# ── 4. final combined data frame -----------------------------------------
+# full df with disparities
 disparity_df <- bind_rows(disparity_df_A_B, disparity_df_C)
 
 
 
-
-
 #### Plot Top2 Token Disparities
-
-# ── 1. means and SEMs ──────────────────────────────────────────────
-stats <- disparity_df %>%                                   # base df from earlier step
+# get mean top2 token disparities
+stats <- disparity_df %>%         
   group_by(cond_clean) %>% 
   summarise(
     across(
       c(top2_token_disparity_OL, top2_token_disparity_HS),
       list(
-        mean = ~ mean(.x, na.rm = TRUE),
-        sem  = ~ sd(.x,  na.rm = TRUE) / sqrt(sum(!is.na(.x)))
+        mean = ~ mean(.x, na.rm = TRUE)
+        # ,sem  = ~ sd(.x,  na.rm = TRUE) / sqrt(sum(!is.na(.x)))
       ),
       .names = "{.col}_{.fn}"
     ),
     .groups = "drop"
   )
 
-# ── 2. reshape for plotting and add 95 % CI ───────────────────────
+# reshape
 plot_df <- stats %>%
   pivot_longer(
     -cond_clean,
-    names_to   = c("Token", ".value"),   # produces columns: Token, mean, sem
-    names_pattern = "(OL|HS)_(.*)"       # splits "OL_mean", "OL_sem", etc.
-  ) %>%
-  mutate(ci95 = 1.96 * sem)              # 95 % confidence interval
+    names_to   = c("Token", ".value"),   # get mean col
+    names_pattern = "(OL|HS)_(.*)"       
+  ) # %>% mutate(ci95 = 1.96 * sem)   # 95ci --> not included 
 
-# ── 3. bar chart with error bars (ggplot2) ───────────────────────
-# colour palette
-pal <- c(OL = "#1f77b4", HS = "#ff7f0e")   # matches your Python palette
+# reorder
+cond_levels <- c("A", "B", "C", "A_conf", "B_conf", "C_conf")
+plot_df <- plot_df %>%
+  mutate(
+    Token      = factor(Token,      levels = c("OL", "HS")),
+    cond_clean = factor(cond_clean, levels = cond_levels)
+  )
 
 
-plot_df %>% 
-  mutate(Token = factor(Token, levels = c("OL", "HS"))) %>%   # ← OL first
-  ggplot(aes(x = cond_clean, y = mean, fill = Token)) +
+# plot
+pal <- c(OL = "#1f77b4", HS = "#ff7f0e")   
+
+ggplot(plot_df,
+       aes(x = cond_clean, y = mean, fill = cond_clean)) +
   geom_col(position = position_dodge(width = 0.8), width = 0.7) +
-  geom_errorbar(
-    aes(ymin = mean - ci95, ymax = mean + ci95),
-    position = position_dodge(width = 0.8),
-    width = 0.25
-  ) +
+  # geom_errorbar(
+  #   aes(ymin = mean - ci95, ymax = mean + ci95),
+  #   position = position_dodge(width = 0.8),
+  #   width = 0.25
+  # ) +
   scale_y_continuous(breaks = seq(0, 16, 2), limits = c(0, 17)) +
   scale_fill_manual(values = pal) +
   labs(
@@ -699,17 +712,41 @@ plot_df %>%
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+ggplot(plot_df,
+       aes(x = cond_clean, y = mean, fill = Token)) +
+  geom_col(show.legend = FALSE) +                     # no legend
+  facet_wrap(~ Token, ncol = 2, scales = "fixed") +   # OL panel then HS panel
+  scale_fill_manual(values = pal) +                   # your custom palette per condition
+  theme_minimal(base_size = 16) +                     # larger base text
+  theme(
+    axis.title.x  = element_text(size = 18, face = "bold"),
+    axis.title.y  = element_text(size = 18, face = "bold"),
+    axis.text.x   = element_text(angle = 45, hjust = 1, size = 14),
+    axis.text.y   = element_text(size = 14),
+    strip.text    = element_text(size = 16, face = "bold"),  # OL / HS titles
+    plot.margin   = margin(10, 10, 10, 10)
+  ) +
+  labs(
+    x = "Condition",
+    y = "Average Top-2 Token Disparity"
+  )
 
-ggsave("Plots/R/certainty_disparity.png", last_plot(),
-       dpi = 300,
-       width = 24, height = 10, units = "in")
+
+ggsave("Plots/R/certainty_disparity.pdf",
+       last_plot(),
+       device = cairo_pdf,     
+       width  = 20,            # close to dina4
+       height = 13,             
+       units  = "cm"
+)
+
 
 
 ################################################################################
-### Agreement of the different uncertainty measures
+###' *Agreement of the different uncertainty measures* (correlations)
 ################################################################################
 
-# ── 1.  tweet-level confidence (row-wise means) ────────────────────────────
+# get the dfs all together
 confidence_df_final <- confidence_df_final %>%
   mutate(
     mean_confidence_OL = rowMeans(
@@ -722,7 +759,7 @@ confidence_df_final <- confidence_df_final %>%
     )
   )
 
-# ── 2.  tweet-level mean disparity across raters ───────────────────────────
+# tweet level mean disparity
 disparity_df_means <- disparity_df %>% 
   group_by(cond_clean, tweet_id) %>% 
   summarise(
@@ -732,23 +769,12 @@ disparity_df_means <- disparity_df %>%
   )
 
 
-
-
-### Plot correlations  ────────────────────────────────────────────────────
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-library(patchwork)     # install.packages("patchwork") if needed
-library(tibble)        # rownames_to_column()
-library(psych)         # corr.test()
-
-# -------------------------------------------------------------------------
-# Custom order for both axes
+### Plot correlations
+# order
 order_vars <- c("self_report", "entropy", "disparity")
-rev_order  <- rev(order_vars)            # for y-axis (top → bottom)
+rev_order  <- rev(order_vars)           
 
-# ───────────────────────────────────── OL ─────────────────────────────────
-# Merge the three OL‐metric tables
+# Merge OL metrics
 merged_ol <- entropy_df_full %>% 
   select(tweet_id, cond_clean, entropy = tweet_entropy_OL) %>% 
   left_join(
@@ -762,12 +788,12 @@ merged_ol <- entropy_df_full %>%
     by = c("tweet_id", "cond_clean")
   )
 
-# Correlation + p-values
+# Correlation & pvalues
 ct_ol <- merged_ol %>% 
   select(all_of(order_vars)) %>% 
   psych::corr.test(use = "pairwise")
 
-# Tidy OL matrix with significance stars
+# tidy matrix
 corr_ol_df <- ct_ol$r %>% 
   as.data.frame() %>% 
   rownames_to_column("Var1") %>% 
@@ -781,9 +807,9 @@ corr_ol_df <- ct_ol$r %>%
   ) %>% 
   mutate(
     stars = case_when(
-      p < 0.001 ~ "***",
-      p < 0.01  ~ "**",
-      p < 0.05  ~ "*",
+      p < 0.001 ~ " ***",
+      p < 0.01  ~ " **",
+      p < 0.05  ~ " *",
       TRUE      ~ ""
     ),
     label = sprintf("%.2f%s", r, stars),
@@ -791,26 +817,38 @@ corr_ol_df <- ct_ol$r %>%
     Var1  = factor(Var1, levels = rev_order)     # y: top → bottom
   )
 
-# Heat-map for OL
+# OL heatmap
+pretty_labels <- c(
+  "self_report" = "Self-\nReport",
+  "entropy" = "Entropy",
+  "disparity" = "Top2-\nToken-\nDisparity"
+)
+
 p_ol <- ggplot(corr_ol_df, aes(Var2, Var1, fill = r)) +
   geom_tile() +
-  geom_text(aes(label = label), size = 3) +
+  geom_text(aes(label = label), size = 5) +
   scale_fill_gradient2(
     limits   = c(-1, 1), midpoint = 0,
     low      = "#2166ac", mid = "white", high = "#b2182b",
     name     = "r"
   ) +
-  labs(title = "Correlation: OL Metrics", x = NULL, y = NULL) +
-  theme_minimal() +
+  scale_x_discrete(labels = pretty_labels) +
+  scale_y_discrete(labels = pretty_labels) +
+  labs(title = "OL", x = NULL, y = NULL) +
+  theme_minimal(base_size = 16) +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid  = element_blank()
+    axis.text.x  = element_text(angle = 0, hjust = 0.5, size = 14),
+    axis.text.y  = element_text(size = 14),
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text  = element_text(size = 14),
+    plot.title   = element_text(size = 18, face = "bold", hjust = 0.5),
+    panel.grid   = element_blank(),
+    plot.margin  = margin(10, 10, 10, 10)
   )
 
 p_ol
 
-# ───────────────────────────────────── HS ─────────────────────────────────
-# Merge the three HS‐metric tables
+### same for HS
 merged_hs <- entropy_df_full %>% 
   select(tweet_id, cond_clean, entropy = tweet_entropy_HS) %>% 
   left_join(
@@ -824,12 +862,12 @@ merged_hs <- entropy_df_full %>%
     by = c("tweet_id", "cond_clean")
   )
 
-# Correlation + p-values
+# Correlation and p-values
 ct_hs <- merged_hs %>% 
   select(all_of(order_vars)) %>% 
   psych::corr.test(use = "pairwise")
 
-# Tidy HS matrix with significance stars
+# HS martrix
 corr_hs_df <- ct_hs$r %>% 
   as.data.frame() %>% 
   rownames_to_column("Var1") %>% 
@@ -843,9 +881,9 @@ corr_hs_df <- ct_hs$r %>%
   ) %>% 
   mutate(
     stars = case_when(
-      p < 0.001 ~ "***",
-      p < 0.01  ~ "**",
-      p < 0.05  ~ "*",
+      p < 0.001 ~ " ***",
+      p < 0.01  ~ " **",
+      p < 0.05  ~ " *",
       TRUE      ~ ""
     ),
     label = sprintf("%.2f%s", r, stars),
@@ -854,29 +892,61 @@ corr_hs_df <- ct_hs$r %>%
   )
 
 # Heat-map for HS
+# without y axis labels as they are side by side
 p_hs <- ggplot(corr_hs_df, aes(Var2, Var1, fill = r)) +
   geom_tile() +
-  geom_text(aes(label = label), size = 3) +
+  geom_text(aes(label = label), size = 5) +
   scale_fill_gradient2(
     limits   = c(-1, 1), midpoint = 0,
     low      = "#2166ac", mid = "white", high = "#b2182b",
     name     = "r"
   ) +
-  labs(title = "Correlation: HS Metrics", x = NULL, y = NULL) +
-  theme_minimal() +
+  scale_x_discrete(labels = pretty_labels) +
+  scale_y_discrete(labels = pretty_labels) +
+  labs(title = "HS", x = NULL, y = NULL) +
+  theme_minimal(base_size = 16) +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid  = element_blank()
+    axis.text.x  = element_text(angle = 0, hjust = 0.5, size = 14),
+    # axis.text.y  = element_text(size = 14),
+    axis.text.y  = element_blank(),
+    legend.title = element_text(size = 16, face = "bold"),
+    legend.text  = element_text(size = 14),
+    plot.title   = element_text(size = 18, face = "bold", hjust = 0.5),
+    panel.grid   = element_blank(),
+    plot.margin  = margin(10, 10, 10, 10)
   )
 
 p_hs
 
-# -------------------------------------------------------------------------
-# Display the two plots side-by-side with a shared legend
+# patckwork side by side
 (p_ol | p_hs) + plot_layout(guides = "collect") &
   theme(legend.position = "right")
 
 
-ggsave("Plots/R/certainty_correlations.png", last_plot(),
-       dpi = 300,
-       width = 24, height = 10, units = "in")
+ggsave("Plots/R/certainty_correlations.pdf", 
+       last_plot(),
+       device = cairo_pdf,     
+       width  = 20,            # close to dina4
+       height = 13,             
+       units  = "cm"
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

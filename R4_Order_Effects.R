@@ -338,62 +338,6 @@ ggsave("Plots/R/order_effects_linear_batch_only.pdf",
 ### PLOT QUADRATIC EFFECTS (ALL CONDITIONS)
 ################################################################################
 
-df_melt <- df_long %>%
-  pivot_longer(cols = c(OL, HS),
-               names_to = "Measure",
-               values_to = "Label") %>%
-  select(batch_id, condition, tweet_in_batch, shot, Measure, Label) %>%
-  ## 1b) drop C.OL↔HS and C.HS↔OL mismatches
-  filter(!(str_detect(condition, "C\\.OL") & Measure == "HS") &
-           !(str_detect(condition, "C\\.HS") & Measure == "OL")) %>%
-  ## 1c) strip “.OL” / “.HS”
-  mutate(condition = str_remove(condition, "\\.OL|\\.HS")) %>%
-  ## 1d) derive facet columns
-  mutate(
-    group_type = case_when(
-      !str_detect(condition, "_")       ~ "base",
-      str_ends(condition, "_batch_conf")~ "batch_conf",
-      str_ends(condition, "_conf")      ~ "conf",
-      str_ends(condition, "_batch")     ~ "batch",
-      TRUE                              ~ "other"
-    ),
-    base_condition = str_split_fixed(condition, "_", 2)[,1],
-    shot_base = paste0(shot, "_", base_condition)
-  ) %>%
-  mutate(
-    group_type = factor(group_type,
-                        levels = c("base","conf","batch","batch_conf"))
-  )
-
-row_order <- c(paste0("few-shot_" , LETTERS[1:3]))
-
-df_melt <- df_melt %>%
-  mutate(shot_base = factor(shot_base, levels = row_order))
-
-# ──────────────────────────────────────────────────────────────
-# 2.  PROPORTIONS FOR PLOT
-# ──────────────────────────────────────────────────────────────
-df_prop <- df_melt %>%
-  group_by(shot, condition, tweet_in_batch, Measure) %>%
-  summarise(Proportion = mean(Label, na.rm = TRUE), .groups = "drop") %>%
-  mutate(
-    group_type = case_when(
-      !str_detect(condition, "_")       ~ "base",
-      str_ends(condition, "_batch_conf")~ "batch_conf",
-      str_ends(condition, "_conf")      ~ "conf",
-      str_ends(condition, "_batch")     ~ "batch",
-      TRUE                              ~ "other"
-    ),
-    base_condition = str_split_fixed(condition, "_", 2)[,1],
-    shot_base = factor(paste0(shot, "_", base_condition),
-                       levels = row_order),
-    group_type = factor(group_type,
-                        levels = c("base","conf","batch","batch_conf"))
-  )
-
-# ──────────────────────────────────────────────────────────────
-# 3.  FACETTED OLS LINES (ggplot2)
-# ──────────────────────────────────────────────────────────────
 palette <- c(OL = "#1f77b4", HS = "#ff7f0e")
 
 g <- ggplot(df_prop,
@@ -402,18 +346,27 @@ g <- ggplot(df_prop,
                 fill = Measure)) +
   geom_point(size = 1.2) +
   geom_smooth(method = "lm", formula = y ~ x + I(x^2), se = TRUE) +
+  scale_x_continuous(breaks = 1:6,
+                     limits = c(1,6)) +
   scale_colour_manual(values = palette, name = NULL) +
   scale_fill_manual(values = palette, guide = "none") + 
   facet_grid(rows = vars(shot_base), cols = vars(group_type)) +
   labs(x = "Tweet Position in Batch",
        y = "Proportion") +
-  theme_bw()
+    theme_bw(base_size = 14) +
+  theme(
+    # make facet labels bold
+    strip.text      = element_text(face = "bold"),
+    # optionally bump axis titles & text further
+    axis.title      = element_text(size = 16),
+    axis.text       = element_text(size = 14),
+    legend.text     = element_text(size = 14),
+    legend.title    = element_text(size = 16)
+  )
+
 g
 
-# ──────────────────────────────────────────────────────────────
-# 4.  GLMMs (binomial logit)  — one per facet × Measure
-#     Formula: Label ~ tweet_in_batch + (1 | batch_id)
-# ──────────────────────────────────────────────────────────────
+### fit glmm with quadr fixed effects
 combos <- df_melt %>%
   distinct(shot_base, group_type, Measure)
 
@@ -441,9 +394,7 @@ pvals <- combos %>%
 
 pvals
 
-# ──────────────────────────────────────────────────────────────
-# 5.  SHADE FACETS WHERE EITHER OL OR HS IS SIGNIFICANT
-# ──────────────────────────────────────────────────────────────
+### add borderlines where sig
 sig_panels <- pvals %>%
   group_by(shot_base, group_type) %>%
   summarise(sig = any(p_value < 0.05 / 24), .groups = "drop") %>%
@@ -461,110 +412,46 @@ if(nrow(sig_panels)) {
 }
 g
 
-# ──────────────────────────────────────────────────────────────
-# 6.  ADD ASTERISKS FOR EACH SIGNIFICANT MEASURE
-# ──────────────────────────────────────────────────────────────
+### add asterisks
 asterisks <- pvals %>%
   filter(p_value < 0.05/24) %>%
-  mutate(y = c(0.90, 0.82)[match(Measure, c("OL","HS"))],
+  mutate(y = 0.9,
+         hjust = c(2.5, 1.5)[match(Measure, c("OL","HS"))],
          label = "*")
 
 g <- g +
   geom_text(data = asterisks,
             inherit.aes = FALSE,
-            aes(x = Inf, y = y, label = label, colour = Measure),
-            hjust = 1.5, vjust = -0.1, size = 10,
+            aes(x = Inf, y = y, label = label, 
+                colour = Measure,
+                hjust = hjust),
+            vjust = 0.3, size = 10,
             fontface = "bold",
             show.legend = FALSE) +
-  scale_colour_manual(values = palette, name = NULL) +
-  ggtitle("Effect of Position on OL/HS Proportions (asterisks = GLMM slope p < 0.05/24; random intercept = batch_id)")
+  scale_colour_manual(values = palette, name = NULL) 
 
 g
 
 
-ggsave("Plots/R/order_effects_quadr_all.png", last_plot(),
-       dpi = 300,
-       width = 24, height = 10, units = "in")
-
-
-
-
-
-
-
-
-
-
-
-
+# save
+ggsave("Plots/R/order_effects_quadr_all.pdf", 
+       last_plot(),
+       device = cairo_pdf,     
+       width  = 29,            # close to dina4
+       height = 13,             
+       units  = "cm"
+)
 
 
 
 ################################################################################
 ### PLOT QUADRATIC EFFECTS (BATCH CONDITIONS ONLY)
 ################################################################################
-# ──────────────────────────────────────────────────────────────
-# 1.  DATA PREPARATION   (melt, filter, derive facet keys)
-# ──────────────────────────────────────────────────────────────
-df_melt <- df_long %>% filter(grepl('batch', condition)) %>% 
-  pivot_longer(cols = c(OL, HS),
-               names_to = "Measure",
-               values_to = "Label") %>%
-  select(batch_id, condition, tweet_in_batch, shot, Measure, Label) %>%
-  ## 1b) drop C.OL↔HS and C.HS↔OL mismatches
-  filter(!(str_detect(condition, "C\\.OL") & Measure == "HS") &
-           !(str_detect(condition, "C\\.HS") & Measure == "OL")) %>%
-  ## 1c) strip “.OL” / “.HS”
-  mutate(condition = str_remove(condition, "\\.OL|\\.HS")) %>%
-  ## 1d) derive facet columns
-  mutate(
-    group_type = case_when(
-      !str_detect(condition, "_")       ~ "base",
-      str_ends(condition, "_batch_conf")~ "batch_conf",
-      str_ends(condition, "_conf")      ~ "conf",
-      str_ends(condition, "_batch")     ~ "batch",
-      TRUE                              ~ "other"
-    ),
-    base_condition = str_split_fixed(condition, "_", 2)[,1],
-    shot_base = paste0(shot, "_", base_condition)
-  ) %>%
-  mutate(
-    group_type = factor(group_type,
-                        levels = c("base","conf","batch","batch_conf"))
-  )
 
-row_order <- c(paste0("few-shot_" , LETTERS[1:3]))
-
-df_melt <- df_melt %>%
-  mutate(shot_base = factor(shot_base, levels = row_order))
-
-# ──────────────────────────────────────────────────────────────
-# 2.  PROPORTIONS FOR PLOT
-# ──────────────────────────────────────────────────────────────
-df_prop <- df_melt %>%
-  group_by(shot, condition, tweet_in_batch, Measure) %>%
-  summarise(Proportion = mean(Label, na.rm = TRUE), .groups = "drop") %>%
-  mutate(
-    group_type = case_when(
-      !str_detect(condition, "_")       ~ "base",
-      str_ends(condition, "_batch_conf")~ "batch_conf",
-      str_ends(condition, "_conf")      ~ "conf",
-      str_ends(condition, "_batch")     ~ "batch",
-      TRUE                              ~ "other"
-    ),
-    base_condition = str_split_fixed(condition, "_", 2)[,1],
-    shot_base = factor(paste0(shot, "_", base_condition),
-                       levels = row_order),
-    group_type = factor(group_type,
-                        levels = c("base","conf","batch","batch_conf"))
-  )
-
-# ──────────────────────────────────────────────────────────────
-# 3.  FACETTED OLS LINES (ggplot2)
-# ──────────────────────────────────────────────────────────────
+# base plot
 palette <- c(OL = "#1f77b4", HS = "#ff7f0e")
 
-g <- ggplot(df_prop,
+g <- ggplot(df_prop_batch,
             aes(tweet_in_batch, Proportion, 
                 colour = Measure,
                 fill = Measure)) +
@@ -578,18 +465,17 @@ g <- ggplot(df_prop,
   theme_bw()
 g
 
-# ──────────────────────────────────────────────────────────────
-# 4.  GLMMs (binomial logit)  — one per facet × Measure
-#     Formula: Label ~ tweet_in_batch + (1 | batch_id)
-# ──────────────────────────────────────────────────────────────
-combos <- df_melt %>%
+### fit glmm qith quadratic effects
+combos <- df_melt_batch %>%
   distinct(shot_base, group_type, Measure)
 
 pvals <- combos %>%
   mutate(p_value = pmap_dbl(list(shot_base, group_type, Measure),
                             function(sb, gt, meas) {
-                              sub <- df_melt %>%
-                                filter(shot_base == sb, group_type == gt, Measure == meas)
+                              sub <- df_melt_batch %>%
+                                filter(shot_base == sb, 
+                                       group_type == gt, 
+                                       Measure == meas)
                               
                               # skip if not enough variation
                               if(n_distinct(sub$batch_id) < 2 ||
@@ -609,9 +495,7 @@ pvals <- combos %>%
 
 pvals
 
-# ──────────────────────────────────────────────────────────────
-# 5.  SHADE FACETS WHERE EITHER OL OR HS IS SIGNIFICANT
-# ──────────────────────────────────────────────────────────────
+### border lines
 sig_panels <- pvals %>%
   group_by(shot_base, group_type) %>%
   summarise(sig = any(p_value < 0.05 / 12), .groups = "drop") %>%
@@ -629,9 +513,7 @@ if(nrow(sig_panels)) {
 }
 g
 
-# ──────────────────────────────────────────────────────────────
-# 6.  ADD ASTERISKS FOR EACH SIGNIFICANT MEASURE
-# ──────────────────────────────────────────────────────────────
+### asterisks
 asterisks <- pvals %>%
   filter(p_value < 0.05/12) %>%
   mutate(y = c(0.90, 0.82)[match(Measure, c("OL","HS"))],
@@ -650,6 +532,11 @@ g <- g +
 g
 
 
-ggsave("Plots/R/order_effects_quadr_batch_only.png", last_plot(),
-       dpi = 300,
-       width = 24, height = 10, units = "in")
+ggsave("Plots/R/order_effects_quadr_batch_only.pdf",
+       last_plot(),
+       device = cairo_pdf,     
+       width  = 29,            # close to dina4
+       height = 13,             
+       units  = "cm"
+)
+
