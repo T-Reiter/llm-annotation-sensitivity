@@ -155,3 +155,95 @@ tab_model(model_HS,                 # get the table for the paper
 
 
 
+
+
+################################################################################
+###' Repeated Regression with Task Condition C as baseline
+################################################################################
+
+colnames(df_long)
+
+df_long$batch <- ifelse(grepl('batch', df_long$condition), 1, 0)
+df_long$conf <- ifelse(grepl('conf', df_long$condition), 1, 0)
+
+df_long$batch_f <- factor(ifelse(grepl("batch", df_long$condition), 
+                                 "batch", "noBatch"))
+df_long$conf_f  <- factor(ifelse(grepl("conf",  df_long$condition), 
+                                 "conf",  "noConf"))
+
+
+df_long <- df_long %>% 
+  mutate(
+    task = case_when(
+      grepl("C\\.OL", condition) ~ "C.OL",
+      grepl("C\\.HS", condition) ~ "C.HS",
+      grepl("A",     condition)  ~ "A",
+      grepl("B",     condition)  ~ "B",
+      TRUE                       ~ NA_character_  
+    )
+  )
+
+# GLMM for OL
+library(lme4)
+library(broom.mixed)
+colnames(df_long)
+
+df_long_OL <- df_long[!grepl('C.HS', df_long$condition) , ]
+df_long_OL$task <- factor(df_long_OL$task, levels = c("C.OL", "A", "B"))
+
+model_OL_ref_c <- glmer(OL ~ 1 + task + batch + conf + (1 | tweet_id),
+                  data = df_long_OL,
+                  family = binomial
+                  , control = glmerControl(optimizer = "bobyqa")
+)
+summary(model_OL_ref_c)
+options(scipen = 9)
+tidy(model_OL_ref_c,conf.int=TRUE,exponentiate=FALSE,effects="fixed") %>% 
+  mutate(across(
+    .cols = where(is.numeric),
+    .fns  = ~ round(.x, 3))) |> 
+  as.data.frame() |> print()
+# lower prob for OL in task B and C 
+#     --> in B: OL is asked second
+# lower prob for B in batch
+# higher prob when asking for confidence 
+
+tab_model(model_OL_ref_c,           # get the table for the paper 
+          transform = NULL,         # betas 
+          show.intercept = FALSE)   # no intercept term
+
+
+
+# GLMM for HS
+df_long_HS <- df_long[!grepl('C.OL', df_long$condition) , ]
+df_long_HS$task <- factor(df_long_HS$task, levels = c("C.HS", "A", "B"))
+model_HS_ref_c <- glmer(HS ~ 1 + task + batch + conf + (1 | tweet_id),
+                  data = df_long_HS,
+                  family = binomial
+                  , control = glmerControl(optimizer = "bobyqa")
+)
+
+summary(model_HS_ref_c)
+
+tidy(model_HS_ref_c,conf.int=TRUE,exponentiate=FALSE,effects="fixed") %>% 
+  mutate(across(
+    .cols = where(is.numeric),
+    .fns  = ~ round(.x, 3))) |> 
+  as.data.frame() |> print()
+
+
+# higher prob for HS in task B and C
+#     --> in B: HS is asked first
+# lower prob for B in batch
+# higher prob when asking for confidence 
+
+
+tab_model(model_HS_ref_c,           # get the table for the paper 
+          transform = NULL,         # betas 
+          show.intercept = FALSE)   # no intercept term
+
+
+
+
+
+
