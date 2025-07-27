@@ -183,9 +183,9 @@ confidence_df_final$R2_HS_confidence <- as.numeric(confidence_df_final$R2_HS_con
 confidence_df_final$R3_HS_confidence <- as.numeric(confidence_df_final$R3_HS_confidence)
 
 ## sanity checks
-# cat("NRows A and B conditions :", nrow(confidence_df_A_B), "\n")
-# cat("NRows C conditions       :", nrow(confidence_df_C),   "\n")
-# cat("NRows total              :", nrow(confidence_df_final), "\n")
+# nrow(confidence_df_A_B)
+# nrow(confidence_df_C)
+# nrow(confidence_df_final)
 
 
 ###############

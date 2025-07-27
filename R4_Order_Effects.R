@@ -50,16 +50,12 @@ shared_cols <- c("batch_id", "tweet_in_batch", "tweet_id",
 # loop over responder IDs
 df_list <- list()
 for (responder in c("R1", "R2", "R3")) {
-  
   # use the shared cols
   df_temp <- all_data[ , shared_cols, drop = FALSE]
-  
   # add responder col
   df_temp$responder <- responder
-  
   # get labels by responder
   df_temp$label  <- all_data[[paste0(responder, "_label")]]
-  
   # save
   df_list[[responder]] <- df_temp
 }
@@ -325,7 +321,7 @@ g
 ggsave("Plots/R/order_effects_linear_batch_only.pdf", 
        last_plot(),
        device = cairo_pdf,     
-       width  = 29,            # close to dina4
+       width  = 29,            
        height = 13,             
        units  = "cm"
 )

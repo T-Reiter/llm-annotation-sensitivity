@@ -61,7 +61,8 @@ shared_cols <- c(
 
 # wide to long
 df_long <- combined_df %>%
-  select(batch_id, tweet_in_batch, tweet_id, tweet, condition, shot, starts_with("R")) %>%
+  select(batch_id, tweet_in_batch, tweet_id, tweet, condition, shot, 
+         starts_with("R")) %>%
   pivot_longer(
     cols      = starts_with("R"),
     names_to  = c("responder", ".value"),

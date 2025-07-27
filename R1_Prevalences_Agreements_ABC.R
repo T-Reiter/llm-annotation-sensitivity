@@ -346,7 +346,7 @@ ggsave(
   "Plots/R/prevalences_zerofew_ABC.pdf",
   plot   = last_plot(),
   device = cairo_pdf,     
-  width  = 29,            # close to dina4
+  width  = 29,            # roughly DinA4
   height = 17,             
   units  = "cm"
 )
@@ -428,7 +428,7 @@ ggplot(df_prop_few, aes(x = condition, y = Value, fill = Measure)) +
 ggsave("Plots/R/prevalences_fewshot_ABC.pdf", 
        last_plot(),
        device = cairo_pdf,     
-       width  = 29,            # close to dina4
+       width  = 29,           
        height = 17,             
        units  = "cm"
 )
@@ -572,7 +572,7 @@ kern_modes <- tweets_full %>%
   group_by(tweet_id) %>%
   reframe(
     global_HS = Mode(hate_speech)[1], # select first if multiple modes
-                                      # possible if a tweet was rated only 14 times
+                                      # possible if tweet has only 14 ratings
     global_OL = Mode(offensive_language)[1], 
     .groups = "drop"
   )
@@ -618,7 +618,7 @@ base_cond_order <- paste0(rep(prefixes, each = length(suffixes)), suffixes)
 outcome = 'OL'
 shot_code = 'few'
 
-# build one panel (one outcome × one shot) and return long data-frame
+# build one panel (one outcome and shot) and return long data-frame
 build_panel_df <- function(outcome = c("OL", "HS"),
                            shot_code = c("zero", "few")) {
   
@@ -628,7 +628,7 @@ build_panel_df <- function(outcome = c("OL", "HS"),
   # select correct matrix
   mat <- get(paste0("across_", outcome, "_", shot_code))
   
-  # frop the 'wrong' C.OL and C.HS cols
+  # frop the 'wrong' duplciated C.OL and C.HS cols
   other_outcome <- ifelse(outcome == "HS", "OL", "HS")
   no_cond       <- paste0("C.", other_outcome)
   keep_rows     <- !str_detect(rownames(mat), fixed(no_cond))
@@ -832,7 +832,7 @@ df_long <- df_long %>%
       grepl("C\\.HS", condition) ~ "C.HS",
       grepl("A",     condition)  ~ "A",
       grepl("B",     condition)  ~ "B",
-      TRUE                       ~ NA_character_     # fallback, if needed
+      TRUE                       ~ NA_character_     # fallback
     )
   )
 
