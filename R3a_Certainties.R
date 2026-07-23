@@ -30,7 +30,7 @@ rm(list = ls())
 ### Load, RBind, and restructure the GPT Labelled Tweets
 ################################################################################
 
-csv_paths <- list.files("Data_Collection/OL_NH", 
+csv_paths <- list.files("Data_Collection/OL_NH/", 
                         pattern = "\\.csv$", full.names = TRUE)
 csv_paths <- csv_paths[grepl('2025_07_01', csv_paths)]
 dfs <- lapply(csv_paths, read_csv, show_col_types = FALSE)
@@ -256,11 +256,11 @@ ggplot(long_df, aes(x = cond_clean, y = mean_confidence, fill = group)) +
   coord_cartesian(ylim = c(70, 100))
 
 
-ggsave("Plots/R/certainty_selfreport.pdf",
+ggsave("Plots/certainty_selfreport.pdf",
        last_plot(),
-       device = cairo_pdf,     
+       device = cairo_pdf,
        width  = 20,            # close to dina4
-       height = 13,             
+       height = 13,
        units  = "cm"
 )
 
@@ -402,11 +402,11 @@ ggplot(mean_entropy_long,
 
 
 
-ggsave("Plots/R/certainty_entropy.pdf", 
+ggsave("Plots/certainty_entropy.pdf",
        last_plot(),
-       device = cairo_pdf,     
+       device = cairo_pdf,
        width  = 20,            # close to dina4
-       height = 13,             
+       height = 13,
        units  = "cm"
 )
 
@@ -732,11 +732,11 @@ ggplot(plot_df,
   )
 
 
-ggsave("Plots/R/certainty_disparity.pdf",
+ggsave("Plots/certainty_disparity.pdf",
        last_plot(),
-       device = cairo_pdf,     
+       device = cairo_pdf,
        width  = 20,            # close to dina4
-       height = 13,             
+       height = 13,
        units  = "cm"
 )
 
@@ -923,11 +923,11 @@ p_hs
   theme(legend.position = "right")
 
 
-ggsave("Plots/R/certainty_correlations.pdf", 
+ggsave("Plots/certainty_correlations.pdf",
        last_plot(),
-       device = cairo_pdf,     
+       device = cairo_pdf,
        width  = 20,            # close to dina4
-       height = 13,             
+       height = 13,
        units  = "cm"
 )
 

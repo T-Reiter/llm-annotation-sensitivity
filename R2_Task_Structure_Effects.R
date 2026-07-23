@@ -51,6 +51,7 @@ cat("Conditions:    ", n_conditions,    "\n")
 
 
 
+
 ################################################################################
 ### Preprocess GPT Labels
 ################################################################################
@@ -98,153 +99,180 @@ df_long <- df_long %>%
     )
   )
 
-# GLMM for OL
+
+# Prepare Data
+df_filtered <- df_long[!grepl('C.HS', df_long$condition), ]
+df_filtered$task <- droplevels(as.factor(df_filtered$task))
+contrasts(df_filtered$task) <- contr.sum(levels(df_filtered$task))
+
+df_filtered$task  <- as.factor(df_filtered$task)
+df_filtered$batch <- as.factor(df_filtered$batch)
+df_filtered$conf  <- as.factor(df_filtered$conf)
+
+
+# Linear Probability Model
 library(lme4)
 library(broom.mixed)
 colnames(df_long)
-model_OL <- glmer(OL ~ 1 + task + batch + conf + (1 | tweet_id),
-                  data = df_long[!grepl('C.HS', df_long$condition) , ],
-                  family = binomial
+library(lmerTest)
+library(sjPlot)
+model_OL_linprob <- lmer(OL ~ 0 + task + batch + conf + (1 | tweet_id),
+                         data = df_filtered,
+)
+# Table for Main Paper
+tab_model(model_OL_linprob)
+
+
+
+#### GLMMs with Marginalization over Random Effects
+# GLMM for OL with reference categories
+# reference is task C (separate labeling)
+df_filtered$task <- relevel(df_filtered$task, ref = "C.OL")
+model_OL_refC <- glmer(OL ~ 1 + task + batch + conf + (1 | tweet_id),
+                       data = df_filtered,
+                       family = binomial(link = "logit")
+                       , control = glmerControl(optimizer = "bobyqa")
+)
+summary(model_OL_refC)
+
+
+# glmm w/o intercept 
+model_OL <- glmer(OL ~ 0 + task + batch + conf + (1 | tweet_id),
+                  data = df_filtered,
+                  family = binomial(link = "logit")
                   , control = glmerControl(optimizer = "bobyqa")
                   )
 summary(model_OL)
-options(scipen = 9)
-tidy(model_OL,conf.int=TRUE,exponentiate=FALSE,effects="fixed") %>% 
-  mutate(across(
-    .cols = where(is.numeric),
-    .fns  = ~ round(.x, 3))) |> 
-  as.data.frame() |> print()
-# lower prob for OL in task B and C 
-#     --> in B: OL is asked second
-# lower prob for B in batch
-# higher prob when asking for confidence 
-
-tab_model(model_OL,                 # get the table for the paper 
-          transform = NULL,         # betas 
-          show.intercept = FALSE)   # no intercept term
 
 
+# get task differences
+library(emmeans)
+task_means <- emmeans(model_OL_linprob, "task")
+print(task_means)
 
-# GLMM for HS
-model_HS <- glmer(HS ~ 1 + task + batch + conf + (1 | tweet_id),
-                  data = df_long[!grepl('C.OL', df_long$condition) , ],
+# Compare all tasks against each other
+task_diffs <- pairs(task_means, adjust = "tukey")
+print(task_diffs)
+
+
+# 1. Get the log-odds (estimates) for each task
+library(emmeans)
+task_means <- emmeans(model_OL, ~ task)
+print(task_means)
+conf_means <- emmeans(model_OL, ~ conf)
+print(conf_means)
+batch_means <- emmeans(model_OL, ~ batch)
+print(batch_means)
+
+overall_means <- emmeans(model_OL, ~ task + batch + conf)
+print(overall_means)
+
+grand_mean <- emmeans(model_OL, ~ 1)
+grand_mean
+cell_means <- emmeans(model_OL, ~ task + batch + conf)
+
+diff_from_global <- contrast(cell_means, method = "eff")
+diff_from_global
+
+task_coef <- contrast(
+  emmeans(model_OL, ~ task),
+  method = "eff"
+)
+task_coef
+
+# 2. To see the "deviations" (how much each task differs from the global intercept)
+# This subtracts the grand mean from each task mean
+eff_means_task <- contrast(task_means, "eff")
+print(eff_means_task)
+eff_means_conf <- contrast(conf_means, "eff")
+print(eff_means_conf)
+eff_means_batch <- contrast(batch_means, "eff")
+print(eff_means_batch)
+
+
+# Standard GLM
+model_OL_glm <- glm(OL ~ 0 + task + batch + conf,
+                    data = df_filtered,
+                    family = binomial(link = "logit"))
+summary(model_OL_glm)
+
+
+tab_model(model_OL_glm,                
+          transform = NULL,         
+          show.intercept = FALSE)   
+
+
+
+#############
+# Modeling HS Labels 
+#############
+
+# Preparing Data 
+df_filtered <- df_long[!grepl('C.OL', df_long$condition), ]
+df_filtered$task <- droplevels(as.factor(df_filtered$task))
+contrasts(df_filtered$task) <- contr.sum(levels(df_filtered$task))
+
+df_filtered$task  <- as.factor(df_filtered$task)
+df_filtered$batch <- as.factor(df_filtered$batch)
+df_filtered$conf  <- as.factor(df_filtered$conf)
+
+# linear probability model
+model_HS_linprob <- lmer(HS ~ 0 + task + batch + conf + (1 | tweet_id),
+                         data = df_filtered,
+)
+summary(model_HS_linprob)
+
+tab_model(model_HS_linprob) # Table of Main Paper 
+
+
+#### GLMMs with Marginalization over Random Effects
+# GLMM for OL with reference categories
+# reference is task C (separate labeling)
+model_HS <- glmer(HS ~ 0 + task + batch + conf + (1 | tweet_id),
+                  data = df_filtered,
                   family = binomial
                   , control = glmerControl(optimizer = "bobyqa")
 )
-
 summary(model_HS)
 
-tidy(model_HS,conf.int=TRUE,exponentiate=FALSE,effects="fixed") %>% 
-  mutate(across(
-    .cols = where(is.numeric),
-    .fns  = ~ round(.x, 3))) |> 
-  as.data.frame() |> print()
+# get task differences
+library(emmeans)
+task_means <- emmeans(model_HS_linprob, "task")
+print(task_means)
 
+# Compare all tasks against each other
+task_diffs <- pairs(task_means, adjust = "tukey")
+print(task_diffs)
 
-# higher prob for HS in task B and C
-#     --> in B: HS is asked first
-# lower prob for B in batch
-# higher prob when asking for confidence 
+# 1. Get the log-odds (estimates) for each task
+library(emmeans)
+task_means <- emmeans(model_HS, ~ task)
+print(task_means)
+conf_means <- emmeans(model_HS, ~ conf)
+print(conf_means)
+batch_means <- emmeans(model_HS, ~ batch)
+print(batch_means)
 
+overall_means <- emmeans(model_HS, ~ task + batch + conf)
+print(overall_means)
 
-tab_model(model_HS,                 # get the table for the paper 
-          transform = NULL,         # betas 
-          show.intercept = FALSE)   # no intercept term
+grand_mean <- emmeans(model_HS, ~ 1)
+grand_mean
+cell_means <- emmeans(model_HS, ~ task + batch + conf)
 
+diff_from_global <- contrast(cell_means, method = "eff")
+diff_from_global
 
-
-
-
-
-
-
-################################################################################
-###' Repeated Regression with Task Condition C as baseline
-################################################################################
-
-colnames(df_long)
-
-df_long$batch <- ifelse(grepl('batch', df_long$condition), 1, 0)
-df_long$conf <- ifelse(grepl('conf', df_long$condition), 1, 0)
-
-df_long$batch_f <- factor(ifelse(grepl("batch", df_long$condition), 
-                                 "batch", "noBatch"))
-df_long$conf_f  <- factor(ifelse(grepl("conf",  df_long$condition), 
-                                 "conf",  "noConf"))
-
-
-df_long <- df_long %>% 
-  mutate(
-    task = case_when(
-      grepl("C\\.OL", condition) ~ "C.OL",
-      grepl("C\\.HS", condition) ~ "C.HS",
-      grepl("A",     condition)  ~ "A",
-      grepl("B",     condition)  ~ "B",
-      TRUE                       ~ NA_character_  
-    )
-  )
-
-# GLMM for OL
-library(lme4)
-library(broom.mixed)
-colnames(df_long)
-
-df_long_OL <- df_long[!grepl('C.HS', df_long$condition) , ]
-df_long_OL$task <- factor(df_long_OL$task, levels = c("C.OL", "A", "B"))
-
-model_OL_ref_c <- glmer(OL ~ 1 + task + batch + conf + (1 | tweet_id),
-                  data = df_long_OL,
-                  family = binomial
-                  , control = glmerControl(optimizer = "bobyqa")
+task_coef <- contrast(
+  emmeans(model_HS, ~ task),
+  method = "eff"
 )
-summary(model_OL_ref_c)
-options(scipen = 9)
-tidy(model_OL_ref_c,conf.int=TRUE,exponentiate=FALSE,effects="fixed") %>% 
-  mutate(across(
-    .cols = where(is.numeric),
-    .fns  = ~ round(.x, 3))) |> 
-  as.data.frame() |> print()
-# lower prob for OL in task B and C 
-#     --> in B: OL is asked second
-# lower prob for B in batch
-# higher prob when asking for confidence 
-
-tab_model(model_OL_ref_c,           # get the table for the paper 
-          transform = NULL,         # betas 
-          show.intercept = FALSE)   # no intercept term
+task_coef
 
 
-
-# GLMM for HS
-df_long_HS <- df_long[!grepl('C.OL', df_long$condition) , ]
-df_long_HS$task <- factor(df_long_HS$task, levels = c("C.HS", "A", "B"))
-model_HS_ref_c <- glmer(HS ~ 1 + task + batch + conf + (1 | tweet_id),
-                  data = df_long_HS,
-                  family = binomial
-                  , control = glmerControl(optimizer = "bobyqa")
-)
-
-summary(model_HS_ref_c)
-
-tidy(model_HS_ref_c,conf.int=TRUE,exponentiate=FALSE,effects="fixed") %>% 
-  mutate(across(
-    .cols = where(is.numeric),
-    .fns  = ~ round(.x, 3))) |> 
-  as.data.frame() |> print()
-
-
-# higher prob for HS in task B and C
-#     --> in B: HS is asked first
-# lower prob for B in batch
-# higher prob when asking for confidence 
-
-
-tab_model(model_HS_ref_c,           # get the table for the paper 
-          transform = NULL,         # betas 
-          show.intercept = FALSE)   # no intercept term
-
-
-
-
-
+# Standard GLM
+model_HS_glm <- glm(HS ~ 0 + task + batch + conf,
+                    data = df_filtered,
+                    family = binomial(link = "logit"))
+summary(model_HS_glm)
 

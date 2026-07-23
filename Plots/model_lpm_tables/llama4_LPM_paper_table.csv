@@ -1,0 +1,13 @@
+term_clean,OL_estimate_fmt,OL_se_fmt,HS_estimate_fmt,HS_se_fmt
+Joint: OL first,0.851***,0.006,0.424***,0.008
+Joint: HS first,0.838***,0.006,0.387***,0.008
+Separate Labeling,0.831***,0.006,0.349***,0.008
+Batch Prompt (vs. Indiv. Prompts),-0.059***,0.001,-0.008***,0.001
+With Confidence (vs. Without),0.014***,0.001,0.027***,0.001
+$\sigma^2$,0.032,--,0.050,--
+$\tau_{00}$\textsubscript{tweet\_id},0.116,--,0.188,--
+ICC,0.782,--,0.791,--
+$N$\textsubscript{tweet\_id},"  3,000",--,"  3,000",--
+Observations,"108,000",--,"108,000",--
+Marginal $R^2$,0.007,--,0.005,--
+Conditional $R^2$,0.784,--,0.792,--

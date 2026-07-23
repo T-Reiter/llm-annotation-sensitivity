@@ -27,7 +27,7 @@ rm(list = ls())
 
 # source the certainty preprocessing from R3a_Certainties
 # ~2 mins
-source('R3a_Certainties.R')
+# source('R3a_Certainties.R')
 
 # remove non-needed objects
 rm(list = setdiff(ls(envir = .GlobalEnv), 
@@ -366,38 +366,34 @@ df_long_disparity_top90_HS <- df_long_disparity_top90_HS %>%
 
 
 ################################################################################
-### Fit the regression models with the top 90%
+### Fit the LPM regression models with the top 90%
 ################################################################################
 
 #' *Confidence* (conf conditions only)
 # GLMM for OL 
 library(lme4)
 colnames(df_long_confidence_top90_OL)
-model_OL_conf <- glmer(OL ~ 1 + task + batch + (1 | tweet_id),
-                  data = df_long_confidence_top90_OL[!grepl('C.HS', 
-                                                            df_long_confidence_top90_OL$condition) , ],
-                  family = binomial
-                  , control = glmerControl(optimizer = "bobyqa")
+model_OL_conf_linprob <- lmer(OL ~ 0 + task + batch + (1 | tweet_id),
+                       data = df_long_confidence_top90_OL[!grepl('C.HS', 
+                                                                 df_long_confidence_top90_OL$condition) , ]
 )
-summary(model_OL_conf)
+summary(model_OL_conf_linprob)
 
-tab_model(model_OL_conf,            # get the table for the paper appendix
+tab_model(model_OL_conf_linprob,            # get the table for the paper appendix
           transform = NULL,         # betas 
           show.intercept = FALSE)   # no intercept term
- 
+
 
 # GLMM for HS
-model_HS_conf <- glmer(HS ~ 1 + task + batch + (1 | tweet_id),
-                  data = df_long_confidence_top90_HS[!grepl('C.OL', 
-                                                            df_long_confidence_top90_HS$condition) , ],
-                  family = binomial
-                  , control = glmerControl(optimizer = "bobyqa")
+model_HS_conf_linprob <- lmer(HS ~ 0 + task + batch + (1 | tweet_id),
+                       data = df_long_confidence_top90_HS[!grepl('C.OL', 
+                                                                 df_long_confidence_top90_HS$condition) , ]
 )
 
-summary(model_HS_conf)
+summary(model_HS_conf_linprob)
 
-tab_model(model_HS_conf,            # get the table for the paper appendix
-          transform = NULL,         # betas 
+tab_model(model_HS_conf_linprob,            # get the table for the paper appendix
+          # transform = NULL,         # betas 
           show.intercept = FALSE)   # no intercept term
 
 
@@ -405,28 +401,24 @@ tab_model(model_HS_conf,            # get the table for the paper appendix
 #' *Entropy* (all conditions)
 # GLMM for OL
 colnames(df_long_entropy_top90_OL)
-model_OL_entr <- glmer(OL ~ 1 + task + batch + conf +(1 | tweet_id),
+model_OL_entr_linprob <- lmer(OL ~ 0 + task + batch + conf +(1 | tweet_id),
                        data = df_long_entropy_top90_OL[!grepl('C.HS', 
-                                                              df_long_entropy_top90_OL$condition) , ],
-                       family = binomial
-                       , control = glmerControl(optimizer = "bobyqa")
+                                                              df_long_entropy_top90_OL$condition) , ]
 )
-summary(model_OL_entr)
+summary(model_OL_entr_linprob)
 
-tab_model(model_OL_entr,            # get the table for the paper appendix
+tab_model(model_OL_entr_linprob,            # get the table for the paper appendix
           transform = NULL,         # betas 
           show.intercept = FALSE)   # no intercept term
 
 # GLMM for HS
-model_HS_entr <- glmer(HS ~ 1 + task + batch + conf + (1 | tweet_id),
+model_HS_entr_linprob <- lmer(HS ~ 0 + task + batch + conf + (1 | tweet_id),
                        data = df_long_entropy_top90_HS[!grepl('C.OL', 
-                                                              df_long_entropy_top90_HS$condition), ],
-                       family = binomial
-                       , control = glmerControl(optimizer = "bobyqa")
+                                                              df_long_entropy_top90_HS$condition), ]
 )
-summary(model_HS_entr)
+summary(model_HS_entr_linprob)
 
-tab_model(model_HS_entr,            # get the table for the paper appendix
+tab_model(model_HS_entr_linprob,            # get the table for the paper appendix
           transform = NULL,         # betas 
           show.intercept = FALSE)   # no intercept term
 
@@ -435,30 +427,24 @@ tab_model(model_HS_entr,            # get the table for the paper appendix
 #' *Disparity* (non batch coniditions only)
 # GLMM for OL
 colnames(df_long_disparity_top90_OL)
-model_OL_disp <- glmer(OL ~ 1 + task + conf + (1 | tweet_id),
+model_OL_disp_linprob <- lmer(OL ~ 0 + task + conf + (1 | tweet_id),
                        data = df_long_disparity_top90_OL[!grepl('C.HS', 
-                                                        df_long_disparity_top90_OL$condition), ],
-                       family = binomial
-                       , control = glmerControl(optimizer = "bobyqa")
+                                                                df_long_disparity_top90_OL$condition), ]
 )
-summary(model_OL_disp)
+summary(model_OL_disp_linprob)
 
-tab_model(model_OL_disp,            # get the table for the paper appendix
+tab_model(model_OL_disp_linprob,            # get the table for the paper appendix
           transform = NULL,         # betas 
           show.intercept = FALSE)   # no intercept term
 
 # GLMM for HS
-model_HS_disp <- glmer(HS ~ 1 + task + conf + (1 | tweet_id),
+model_HS_disp_linprob <- lmer(HS ~ 0 + task + conf + (1 | tweet_id),
                        data = df_long_disparity_top90_HS[!grepl('C.OL', 
-                                                         df_long_disparity_top90_HS$condition), ],
-                       family = binomial
-                       , control = glmerControl(optimizer = "bobyqa")
+                                                                df_long_disparity_top90_HS$condition), ]
 )
-summary(model_HS_disp)
 
-tab_model(model_HS_disp,            # get the table for the paper appendix
+summary(model_HS_disp_linprob)
+
+tab_model(model_HS_disp_linprob,            # get the table for the paper appendix
           transform = NULL,         # betas 
           show.intercept = FALSE)   # no intercept term
-
-
-
