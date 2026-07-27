@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r setup-libs}
 library(tidyverse)
 
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+setwd(rprojroot::find_root(rprojroot::is_rstudio_project))
 rm(list = ls())
 
 source("run_analysis_new.R")
@@ -23,6 +23,7 @@ source("run_pooled_analysis.R")
 ## Load Kern Data
 
 ```{r load-kern-data}
+
 folder_path <- "Tweets_CK"
 
 train_df <- read_csv(file.path(folder_path, "full_train_s.csv"))
@@ -51,11 +52,14 @@ final_summary <- tibble(
   OL = summary$OL,
   HS = summary$HS
 )
+
+save(tweets_full, final_summary, file = "tweets_data.RData")
 ```
 
 ## Load Models
 
 ```{r load-models}
+
 load_model <- function(path, model_name) {
   files <- list.files(path, full.names = TRUE)
 
@@ -100,11 +104,17 @@ model_dfs <- list(
   llama31_70b      = llama31_70b,
   llama4           = llama4
 )
+
+save(model_dfs, model_keys, model_labels, file = "model_data.RData")
 ```
 
 ## Run Prevalence Analyses
 
 ```{r prevalence-analyses}
+
+load("tweets_data.RData")
+load("model_data.RData")
+
 prevalence_results <- imap(model_dfs, function(df, key) {
   run_full_analysis(
     combined_df   = df,
@@ -122,9 +132,14 @@ df_prevalence_all_models <- map_dfr(prevalence_results, "prevalence_data") %>%
       labels = model_labels[model_keys]
     )
   )
+
+saveRDS(df_prevalence_all_models, "df_prevalence_all_models.rds")
 ```
 
 ```{r prevalence-plot, fig.width=3.5, fig.height=9.5}
+
+df_prevalence_all_models <- readRDS("df_prevalence_all_models.rds")
+
 combined_prevalence_plot <- ggplot(
   df_prevalence_all_models,
   aes(x = condition_label, y = Value_Pct, color = group_type)
@@ -240,11 +255,17 @@ lpm_results <- imap(model_dfs, function(df, key) {
     model_name  = key
   )
 })
+
+saveRDS(lpm_results, "lpm_results.rds")
 ```
 
 ## Table -- Wide, All 7 Models
 
 ```{r table-wide}
+
+lpm_results <- readRDS("lpm_results.rds")
+load("model_data.RData")
+
 table1_wide <- build_wide_table(
   lpm_results  = lpm_results,
   model_order  = model_keys,
@@ -256,12 +277,18 @@ write_csv(table1_wide, "Plots/model_lpm_tables/table1_wide_7models.csv")
 table1_wide_latex <- wide_table_to_latex(table1_wide, model_labels[model_keys])
 writeLines(table1_wide_latex, "Plots/model_lpm_tables/table1_wide_7models_latex.txt")
 
+table1_wide_standalone_tex <- wide_table_to_standalone_tex(table1_wide, model_labels[model_keys])
+writeLines(table1_wide_standalone_tex, "Plots/model_lpm_tables/table1_wide_7models_standalone.tex")
+
 table1_wide
 ```
 
 ## Table -- Pooled Model with "Model:" Dummy Terms
 
 ```{r table-pooled}
+
+load("model_data.RData")
+
 pooled_results <- run_pooled_analysis(
   model_dfs    = model_dfs,
   model_labels = model_labels
@@ -272,10 +299,17 @@ dir.create(pooled_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_csv(pooled_results$fixed_table_full, file.path(pooled_dir, "combined_LPM_coefficients_long.csv"))
 write_csv(pooled_results$fixed_table, file.path(pooled_dir, "combined_LPM_model_effects_coefficients.csv"))
-write_csv(pooled_results$paper_table, file.path(pooled_dir, "combined_LPM_paper_table.csv"))
+write_csv(pooled_results$interaction_fixed_table, file.path(pooled_dir, "combined_LPM_interaction_coefficients_long.csv"))
+write_csv(pooled_results$combined_paper_table, file.path(pooled_dir, "combined_LPM_paper_table.csv"))
 
-pooled_latex <- paper_table_to_latex(pooled_results$paper_table)
+pooled_latex <- combined_pooled_table_to_latex(pooled_results$combined_paper_table)
 writeLines(pooled_latex, file.path(pooled_dir, "combined_LPM_latex_rows.txt"))
 
-pooled_results$paper_table
+pooled_standalone_tex <- combined_pooled_table_to_standalone_tex(
+  pooled_results$combined_paper_table,
+  reference_label = pooled_results$reference_label
+)
+writeLines(pooled_standalone_tex, file.path(pooled_dir, "combined_LPM_standalone.tex"))
+
+pooled_results$combined_paper_table
 ```
