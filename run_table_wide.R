@@ -43,9 +43,8 @@ build_wide_table <- function(lpm_results, model_order, model_labels) {
 ################################################################################
 ### wide_table_to_latex()
 ###
-### Renders the wide table as tab-separated LaTeX rows, chunked into groups of
-### `models_per_block` model-columns so it can be split across multiple
-### \resizebox / landscape blocks if needed.
+### Renders the wide table as LaTeX rows, chunked into groups of
+### `models_per_block` model-columns for \resizebox / landscape blocks.
 ################################################################################
 
 wide_table_to_latex <- function(wide, model_labels, models_per_block = length(model_labels)) {
@@ -67,10 +66,8 @@ wide_table_to_latex <- function(wide, model_labels, models_per_block = length(mo
 ################################################################################
 ### paper_table_to_latex()
 ###
-### Renders a single-model-style paper table (term_clean, OL_estimate_fmt,
-### OL_se_fmt, HS_estimate_fmt, HS_se_fmt -- as returned by
-### run_inference_analysis() or run_pooled_analysis()) as LaTeX rows, one row
-### per term, same convention used for the per-model appendix tables.
+### Renders a single-model-style paper table (term_clean, OL/HS
+### estimate_fmt + se_fmt) as LaTeX rows, one row per term.
 ################################################################################
 
 paper_table_to_latex <- function(paper_table) {
@@ -93,9 +90,8 @@ paper_table_to_latex <- function(paper_table) {
 ################################################################################
 ### wide_table_to_standalone_tex()
 ###
-### Wraps wide_table_to_latex()'s row output in a compilable standalone .tex
-### document (own \documentclass, header row, tabular), so the table can be
-### checked with pdflatex without pulling it into the full paper.
+### Wraps wide_table_to_latex()'s rows in a compilable standalone .tex
+### document, so the table can be checked with pdflatex on its own.
 ################################################################################
 
 wide_table_to_standalone_tex <- function(wide, model_labels, models_per_block = length(model_labels)) {
@@ -110,6 +106,34 @@ wide_table_to_standalone_tex <- function(wide, model_labels, models_per_block = 
   )
   header2 <- paste(c("", rep(c("OL", "HS"), length(model_labels))), collapse = " & ")
   colspec <- paste0("l", strrep("cc", length(model_labels)))
+
+  ### Flag any model whose Observations fall short of the modal count
+  ### (e.g. a missing response), so it doesn't have to be caught by hand.
+  obs_row <- wide %>% filter(term_clean == "Observations")
+  obs_by_model <- setNames(
+    as.integer(gsub(",", "", trimws(unlist(obs_row[paste0(model_labels, "_OL")])))),
+    model_labels
+  )
+  typical_n <- as.integer(names(sort(table(obs_by_model), decreasing = TRUE))[1])
+  short_models <- names(obs_by_model)[obs_by_model != typical_n]
+
+  note <- character(0)
+  if (length(short_models) > 0) {
+    detail <- paste0(
+      short_models, " (", format(obs_by_model[short_models], big.mark = ","),
+      ", ", typical_n - obs_by_model[short_models], " fewer)"
+    )
+    total_missing <- sum(typical_n - obs_by_model[short_models])
+    missing_phrase <- if (total_missing == 1) "a missing response" else "missing responses"
+    note <- c(
+      "\\smallskip",
+      paste0(
+        "\\footnotesize \\textit{Note}: Observations = ", format(typical_n, big.mark = ","),
+        " per model, except ", paste(detail, collapse = "; "),
+        ", due to ", missing_phrase, "."
+      )
+    )
+  }
 
   c(
     "\\documentclass{article}",
@@ -130,6 +154,7 @@ wide_table_to_standalone_tex <- function(wide, model_labels, models_per_block = 
     "\\bottomrule",
     "\\end{tabular}%",
     "}",
+    note,
     "\\end{table}",
     "\\end{document}"
   )
@@ -138,8 +163,7 @@ wide_table_to_standalone_tex <- function(wide, model_labels, models_per_block = 
 ################################################################################
 ### paper_table_to_standalone_tex()
 ###
-### Wraps paper_table_to_latex()'s row output in a compilable standalone .tex
-### document (own \documentclass, header row, tabular).
+### Wraps paper_table_to_latex()'s rows in a compilable standalone .tex doc.
 ################################################################################
 
 paper_table_to_standalone_tex <- function(paper_table) {
@@ -168,10 +192,10 @@ paper_table_to_standalone_tex <- function(paper_table) {
 ################################################################################
 ### combined_pooled_table_to_latex()
 ###
-### Renders the combined pooled table (term_clean plus four side-by-side
-### estimate+SE column pairs -- OL_Main, OL_Interaction, HS_Main,
-### HS_Interaction, as returned by run_pooled_analysis()$combined_paper_table)
-### as LaTeX rows, one row per term.
+### Renders run_pooled_analysis()$combined_paper_table (term_clean plus
+### OL/HS Main/Interaction estimate columns) as LaTeX rows under bold
+### section headers, with sigma^2/tau00/N/Observations moved to the table
+### note instead of the body.
 ################################################################################
 
 combined_pooled_table_to_latex <- function(combined) {
@@ -179,51 +203,81 @@ combined_pooled_table_to_latex <- function(combined) {
   library(tidyverse)
 
   cols <- c(
-    "OL_Main_estimate_fmt", "OL_Main_se_fmt",
-    "OL_Interaction_estimate_fmt", "OL_Interaction_se_fmt",
-    "HS_Main_estimate_fmt", "HS_Main_se_fmt",
-    "HS_Interaction_estimate_fmt", "HS_Interaction_se_fmt"
+    "OL_Main_estimate_fmt", "OL_Interaction_estimate_fmt",
+    "HS_Main_estimate_fmt", "HS_Interaction_estimate_fmt"
   )
 
-  rows <- apply(combined, 1, function(r) {
-    vals <- ifelse(is.na(r[cols]), "--", r[cols])
-    paste(c(r[["term_clean"]], vals), collapse = " & ")
-  })
+  row_fmt <- function(term) {
+    i <- match(term, combined$term_clean)
+    vals <- unlist(combined[i, cols])
+    vals <- ifelse(is.na(vals), "--", vals)
+    paste(c(term, vals), collapse = " & ")
+  }
 
-  paste(paste0(rows, " \\\\"), collapse = "\n")
+  subheader <- function(label) paste0("\\multicolumn{5}{l}{\\textbf{", label, "}} \\\\")
+
+  task_terms <- c(
+    "Joint: OL first",
+    "Joint: HS first",
+    "Separate Labeling",
+    "Joint: OL first (vs. Separate Labeling)",
+    "Joint: HS first (vs. Separate Labeling)"
+  )
+  design_terms <- c("With Confidence (vs. Without)", "Batch Prompt (vs. Indiv. Prompts)")
+  model_terms     <- combined$term_clean[str_starts(combined$term_clean, "Model: ") & !str_ends(combined$term_clean, "x Asked First")]
+  model_int_terms <- combined$term_clean[str_ends(combined$term_clean, "x Asked First")]
+  random_terms <- c("ICC", "Marginal $R^2$", "Conditional $R^2$")
+
+  body <- c(
+    subheader("Baseline Probability by Task Structure"),
+    paste0(map_chr(task_terms, row_fmt), " \\\\"),
+    paste0(map_chr(design_terms, row_fmt), " \\\\"),
+    subheader("Model Fixed Effects"),
+    paste0(map_chr(model_terms, row_fmt), " \\\\"),
+    subheader("Model $\\times$ Task Structure Interaction"),
+    paste0(map_chr(model_int_terms, row_fmt), " \\\\"),
+    subheader("Random Effects"),
+    paste0(map_chr(random_terms, row_fmt), " \\\\")
+  )
+
+  paste(body, collapse = "\n")
 }
 
 ################################################################################
 ### combined_pooled_table_to_standalone_tex()
 ###
-### Wraps combined_pooled_table_to_latex()'s row output in a compilable
-### standalone .tex document. `reference_label`, if given, is added as a
-### plain table note below the tabular (not a LaTeX \footnote{}).
+### Wraps combined_pooled_table_to_latex()'s rows in a standalone .tex doc,
+### with sample sizes, star legend, and no-intercept caveat in the note
+### (plus `reference_label`, if given, explaining the "Model:" contrasts).
 ################################################################################
 
 combined_pooled_table_to_standalone_tex <- function(combined, reference_label = NULL) {
 
   body_rows <- combined_pooled_table_to_latex(combined)
 
-  header1 <- paste(
-    c(
-      "Term",
-      "\\multicolumn{2}{c}{OL Main}",
-      "\\multicolumn{2}{c}{OL Interaction}",
-      "\\multicolumn{2}{c}{HS Main}",
-      "\\multicolumn{2}{c}{HS Interaction}"
-    ),
+  header <- paste(
+    c("Term", "OL Main", "OL Interaction", "HS Main", "HS Interaction"),
     collapse = " & "
   )
-  header2 <- paste(c("", rep(c("Est.", "SE"), 4)), collapse = " & ")
 
-  note <- if (is.null(reference_label)) {
-    character(0)
-  } else {
-    c(
-      "\\smallskip",
+  n_tweet <- trimws(combined$OL_Main_estimate_fmt[combined$term_clean == "$N$\\textsubscript{tweet\\_id}"])
+  obs     <- trimws(combined$OL_Main_estimate_fmt[combined$term_clean == "Observations"])
+
+  note <- c(
+    "\\smallskip",
+    paste0(
+      "\\footnotesize \\textit{Note}: All models: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
+      "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
+      "Main-effect models have no intercept (task structure fully dummy-coded); ",
+      "interaction models include an intercept, with Separate Labeling as the reference category."
+    )
+  )
+
+  if (!is.null(reference_label)) {
+    note <- c(
+      note,
       paste0(
-        "\\footnotesize \\textit{Note}: \"Model:\" rows are estimated relative to ",
+        "\\footnotesize \"Model:\" rows are estimated relative to ",
         reference_label, ", the reference model."
       )
     )
@@ -238,10 +292,9 @@ combined_pooled_table_to_standalone_tex <- function(combined, reference_label = 
     "\\begin{table}",
     "\\centering",
     "\\resizebox{\\textwidth}{!}{%",
-    "\\begin{tabular}{lcccccccc}",
+    "\\begin{tabular}{lcccc}",
     "\\toprule",
-    paste0(header1, " \\\\"),
-    paste0(header2, " \\\\"),
+    paste0(header, " \\\\"),
     "\\midrule",
     body_rows,
     "\\bottomrule",

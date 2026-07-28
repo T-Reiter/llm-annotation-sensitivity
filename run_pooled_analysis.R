@@ -2,24 +2,23 @@
 ### run_pooled_analysis()
 ###
 ### Pooled LPM across all models: one regression per outcome (OL, HS) with
-### task structure, batch, confidence, AND model as fixed effects. `task`
-### keeps the no-intercept full-dummy coding used throughout the paper (every
-### level gets a directly-estimated baseline probability). `model` uses plain
-### treatment (reference) coding against `reference_model`, so every
-### non-reference model's coefficient is a directly-estimated difference from
-### it -- no sum-coding recovery needed.
+### task, batch, confidence, and model as fixed effects. `task` keeps the
+### no-intercept full-dummy coding used throughout the paper; `model` uses
+### treatment coding against `reference_model`.
 ###
-### `model_dfs` is a named list of combined_df (as returned by load_model()),
-### names are used as the model factor's levels. `model_labels` gives the
-### display label per model key (same order). `reference_model` (a key in
-### `model_dfs`) is the omitted/reference category for the model factor.
+### `model_dfs` is a named list of combined_df (as returned by load_model());
+### `model_labels` gives the display label per key; `reference_model` is the
+### omitted/reference category for the model factor.
 ################################################################################
 
 run_pooled_analysis <- function(
     model_dfs,
     model_labels,
-    reference_model = "gpt4o_mini"
+    reference_model = "gpt4o_mini",
+    family = c("gaussian", "binomial")
 ) {
+
+  family <- match.arg(family)
 
   library(tidyverse)
   library(stringr)
@@ -79,7 +78,11 @@ run_pooled_analysis <- function(
     # model keeps default treatment contrasts (reference = first level = reference_model)
 
     fml <- as.formula(paste0(outcome, " ~ 0 + task + batch + conf + model + (1 | tweet_id)"))
-    lmer(fml, data = df_out)
+    if (family == "binomial") {
+      glmer(fml, data = df_out, family = binomial(link = "logit"), verbose = 1)
+    } else {
+      lmer(fml, data = df_out, verbose = 1)
+    }
   }
 
   model_OL <- fit_one("OL")
@@ -154,17 +157,11 @@ run_pooled_analysis <- function(
     arrange(term_clean) %>%
     mutate(term_clean = as.character(term_clean))
 
-  ##############################################################################
   ### Interaction models: does the "asked first" task effect differ by model?
-  ###
-  ### These need a normal intercept -- bolting `task:model` onto the
-  ### no-intercept `task` dummy above is exactly collinear with it (verified
-  ### empirically: R silently drops a column and the fit is meaningless).
-  ### So `task` here is split into two explicit 0/1 mains (`ol_first`,
-  ### `hs_first`, both vs. "Separate Labeling"), and only the relevant one is
-  ### interacted with `model` -- OL model gets ol_first:model, HS model gets
-  ### hs_first:model.
-  ##############################################################################
+  ### Needs a normal intercept (no-intercept `task` dummy + `task:model` is
+  ### collinear), so `task` is split into two 0/1 mains (`ol_first`,
+  ### `hs_first`, vs. "Separate Labeling") and only the relevant one is
+  ### interacted with `model`.
 
   fit_interaction <- function(outcome) {
 
@@ -189,7 +186,11 @@ run_pooled_analysis <- function(
       outcome, " ~ ol_first + hs_first + batch + conf + model + ",
       interaction_var, ":model + (1 | tweet_id)"
     ))
-    lmer(fml, data = df_out)
+    if (family == "binomial") {
+      glmer(fml, data = df_out, family = binomial(link = "logit"), verbose = 1)
+    } else {
+      lmer(fml, data = df_out, verbose = 1)
+    }
   }
 
   model_OL_interaction <- fit_interaction("OL")
@@ -254,16 +255,9 @@ run_pooled_analysis <- function(
     arrange(term_clean) %>%
     mutate(term_clean = as.character(term_clean))
 
-  ##############################################################################
-  ### Combined table: one row per term, 4 side-by-side column groups in order
-  ### OL Main, OL Interaction, HS Main, HS Interaction. Terms not used by a
-  ### given spec are left blank ("--") for that column group. The interaction
-  ### models' intercept is the same estimand as "Separate Labeling" in the
-  ### main models (baseline probability at batch=0, conf=0, reference model),
-  ### so it shares that row rather than getting its own "Intercept" row --
-  ### note the two specs' numbers can differ slightly since each model's
-  ### REML variance components are estimated independently.
-  ##############################################################################
+  ### Combined table: one row per term, 4 side-by-side column groups (OL/HS
+  ### x Main/Interaction). The interaction models' intercept shares the
+  ### "Separate Labeling" row rather than getting its own "Intercept" row.
 
   combined_row_order <- c(
     "Joint: OL first",
@@ -309,17 +303,14 @@ run_pooled_analysis <- function(
       HS_Interaction_estimate_fmt, HS_Interaction_se_fmt
     )
 
-  ##############################################################################
-  ### Model fit info (sigma^2, tau00, ICC, N, Observations, R^2), same
-  ### statistics/formatting as the per-model wide Table 1
-  ### (see run_inference_analysis_v2.R::extract_model_stats()), appended as
-  ### extra rows below the coefficients for each of the 4 specs.
-  ##############################################################################
+  ### Model fit info (sigma^2, tau00, ICC, N, Observations, R^2), same as
+  ### the per-model wide Table 1 (run_inference_analysis_v2.R), appended
+  ### below the coefficients for each of the 4 specs.
 
   extract_model_stats <- function(model, outcome) {
 
     vc <- as.data.frame(VarCorr(model))
-    sigma2 <- sigma(model)^2
+    sigma2 <- if (family == "binomial") (pi^2) / 3 else sigma(model)^2
     tau00 <- vc %>% filter(grp == "tweet_id") %>% pull(vcov)
     icc <- tau00 / (tau00 + sigma2)
     r2 <- performance::r2_nakagawa(model)
@@ -393,8 +384,7 @@ run_pooled_analysis <- function(
     arrange(term_clean) %>%
     mutate(term_clean = as.character(term_clean))
 
-  # Saving to disk (CSV + LaTeX) is done by the caller (see main.R), same as
-  # for the wide Table 1.
+  # Saving to disk is done by the caller (see main.R).
   list(
     model_OL = model_OL,
     model_HS = model_HS,

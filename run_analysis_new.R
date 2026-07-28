@@ -1,12 +1,9 @@
 ################################################################################
 ### run_full_analysis()
 ###
-### Per-model prevalence engine behind Figure 2 (combined_prevalences plot).
-### Takes one model's combined (few-shot) label data, reshapes to long format,
-### derives task structure / batch / confidence condition groups, and returns
-### condition-level OL and HS prevalences. Also (re)builds the global
-### `ref_lines` data frame used by main.R's ggplot call, from the human
-### reference rates in `final_summary`.
+### Per-model prevalence engine behind Figure 2. Reshapes one model's label
+### data to long format and returns condition-level OL/HS prevalences; also
+### (re)builds the global `ref_lines` used by main.R's plot.
 ################################################################################
 
 run_full_analysis <- function(combined_df, model_name, tweets_full, final_summary) {
@@ -14,10 +11,7 @@ run_full_analysis <- function(combined_df, model_name, tweets_full, final_summar
   library(tidyverse)
   library(stringr)
 
-  ##############################################################################
   ### Wide to long: one row per (tweet, condition, responder)
-  ##############################################################################
-
   df_long <- combined_df %>%
     select(batch_id, tweet_in_batch, tweet_id, tweet, condition, shot, starts_with("R")) %>%
     pivot_longer(
@@ -30,10 +24,7 @@ run_full_analysis <- function(combined_df, model_name, tweets_full, final_summar
       HS = as.integer(str_detect(label, "(?<!N)HS"))
     )
 
-  ##############################################################################
   ### Derive condition structure: task (A/B/C.OL/C.HS), batch, conf
-  ##############################################################################
-
   df_long <- df_long %>%
     mutate(
       condition_base = case_when(
@@ -62,12 +53,9 @@ run_full_analysis <- function(combined_df, model_name, tweets_full, final_summar
       group_type = factor(group_type, levels = c("base", "conf", "batch", "batch_conf"))
     )
 
-  ##############################################################################
-  ### OL / HS prevalence by condition
-  ### (C.HS rows don't carry a valid OL judgement in the "separate" design,
-  ###  and vice versa for C.OL rows and HS -- drop the mismatched half)
-  ##############################################################################
-
+  ### OL / HS prevalence by condition (drop the mismatched half: C.HS
+  ### rows have no valid OL judgement in the "separate" design, and vice
+  ### versa for C.OL rows and HS)
   df_OL <- df_long %>%
     filter(condition_base != "C.HS") %>%
     transmute(condition_label, group_type, Measure = "OL", Value = OL)
@@ -85,11 +73,8 @@ run_full_analysis <- function(combined_df, model_name, tweets_full, final_summar
       Measure    = factor(Measure, levels = c("OL", "HS"))
     )
 
-  ##############################################################################
-  ### Human reference lines (same across models) -- exposed globally since
-  ### main.R's plot references a bare `ref_lines` object
-  ##############################################################################
-
+  ### Human reference lines -- exposed globally since main.R's plot
+  ### references a bare `ref_lines` object
   overall_OL <- final_summary %>% filter(version == "overall") %>% pull(OL)
   overall_HS <- final_summary %>% filter(version == "overall") %>% pull(HS)
 
