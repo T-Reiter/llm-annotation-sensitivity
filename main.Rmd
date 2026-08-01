@@ -528,71 +528,6 @@ ggsave(
 )
 ```
 
-### Same, Dropping Llama 3.1 8B
-
-```{r prevalence-heatmap-model-mean-stacked-no8b, fig.width=6, fig.height=14}
-
-df_heatmap_mm_no8b <- df_heatmap_mm %>%
-  filter(model != "Llama 3.1 8B") %>%
-  mutate(model = fct_drop(model))
-
-### Re-scaled color limits without the 8B outlier
-dev_limit_mm_no8b <- ceiling(max(abs(df_heatmap_mm_no8b$deviation_model), na.rm = TRUE) / 5) * 5
-
-df_heatmap_mm_no8b <- df_heatmap_mm_no8b %>%
-  mutate(text_color_mm = if_else(abs(deviation_model) > dev_limit_mm_no8b * 0.55, "white", "grey15"))
-
-prevalence_heatmap_model_mean_stacked_no8b <- ggplot(
-  df_heatmap_mm_no8b,
-  aes(x = model, y = fct_rev(x_label), fill = deviation_model)
-) +
-
-  geom_tile(color = "white", linewidth = 0.6) +
-
-  geom_text(
-    aes(label = sprintf("%+.0f", deviation_model), color = text_color_mm),
-    size = 2.5
-  ) +
-
-  geom_hline(yintercept = c(4.5, 8.5), color = "white", linewidth = 1.4) +
-
-  facet_wrap(~ facet_label_mm, ncol = 1, scales = "free_x") +
-
-  scale_y_discrete(labels = x_label_long_map) +
-
-  scale_fill_distiller(
-    palette   = "RdBu",
-    direction = -1,
-    limits    = c(-dev_limit_mm_no8b, dev_limit_mm_no8b),
-    name      = "Deviation from\nmodel's own mean (pts)"
-  ) +
-
-  scale_color_identity() +
-
-  labs(x = NULL, y = NULL) +
-
-  theme_minimal(base_size = 9) +
-  theme(
-    panel.grid       = element_blank(),
-    strip.background = element_blank(),
-    strip.text       = element_text(face = "bold", size = 10),
-    axis.text.x      = element_text(size = 7.5, angle = 30, hjust = 1),
-    axis.text.y      = element_text(size = 6.5, lineheight = 1.0),
-    legend.position  = "right"
-  )
-
-prevalence_heatmap_model_mean_stacked_no8b
-
-ggsave(
-  "Plots/prevalence_heatmap_all_models_vs_model_mean_stacked_no8b.pdf",
-  prevalence_heatmap_model_mean_stacked_no8b,
-  device = cairo_pdf,
-  width  = 12,
-  height = 24,
-  units  = "cm"
-)
-```
-
 ## Run Individual LPM Models
 
 ```{r lpm-models}
@@ -634,9 +569,9 @@ writeLines(table1_wide_standalone_tex, "Plots/model_lpm_tables/table1_wide_7mode
 table1_wide
 ```
 
-## Table -- Pooled Model with "Model:" Dummy Terms
+## Table -- Pooled Models, LPMs
 
-```{r table-pooled}
+```{r pooled-lpm-fit}
 
 load("model_data.RData")
 
@@ -645,29 +580,45 @@ pooled_results <- run_pooled_analysis(
   model_labels = model_labels
 )
 
-pooled_dir <- "Plots/combined_inference"
-dir.create(pooled_dir, recursive = TRUE, showWarnings = FALSE)
+saveRDS(pooled_results, "Plots/combined_inference/pooled_results_lpm.rds")
+```
 
-write_csv(pooled_results$fixed_table_full, file.path(pooled_dir, "combined_LPM_coefficients_long.csv"))
-write_csv(pooled_results$fixed_table, file.path(pooled_dir, "combined_LPM_model_effects_coefficients.csv"))
-write_csv(pooled_results$interaction_fixed_table, file.path(pooled_dir, "combined_LPM_interaction_coefficients_long.csv"))
+```{r table-pooled}
+
+pooled_results <- readRDS("Plots/combined_inference/pooled_results_lpm.rds")
+pooled_dir <- "Plots/combined_inference"
+
 write_csv(pooled_results$combined_paper_table, file.path(pooled_dir, "combined_LPM_paper_table.csv"))
 
-pooled_latex <- combined_pooled_table_to_latex(pooled_results$combined_paper_table)
+pooled_latex <- combined_pooled_table_to_latex(pooled_results$combined_paper_table, pooled_results$model_level_labels)
 writeLines(pooled_latex, file.path(pooled_dir, "combined_LPM_latex_rows.txt"))
 
 pooled_standalone_tex <- combined_pooled_table_to_standalone_tex(
   pooled_results$combined_paper_table,
+  model_level_labels = pooled_results$model_level_labels,
   reference_label = pooled_results$reference_label
 )
 writeLines(pooled_standalone_tex, file.path(pooled_dir, "combined_LPM_standalone.tex"))
 
+write_csv(pooled_results$combined_paper_table_randomslopes, file.path(pooled_dir, "combined_LPM_randomslopes_paper_table.csv"))
+
+pooled_randomslopes_latex <- combined_pooled_table_randomslopes_to_latex(pooled_results$combined_paper_table_randomslopes, pooled_results$model_level_labels)
+writeLines(pooled_randomslopes_latex, file.path(pooled_dir, "combined_LPM_randomslopes_latex_rows.txt"))
+
+pooled_randomslopes_standalone_tex <- combined_pooled_table_randomslopes_to_standalone_tex(
+  pooled_results$combined_paper_table_randomslopes,
+  model_level_labels = pooled_results$model_level_labels,
+  reference_label = pooled_results$reference_label
+)
+writeLines(pooled_randomslopes_standalone_tex, file.path(pooled_dir, "combined_LPM_randomslopes_standalone.tex"))
+
 pooled_results$combined_paper_table
+pooled_results$combined_paper_table_randomslopes
 ```
 
-## Table -- Pooled Model, Mixed-Effects Logistic Regression
+## Table -- Pooled Models, Mixed-Effects Logistic Regression
 
-```{r table-pooled-logit}
+```{r pooled-logit-fit}
 
 load("model_data.RData")
 
@@ -677,16 +628,22 @@ pooled_results_logit <- run_pooled_analysis(
   family       = "binomial"
 )
 
-pooled_logit_dir <- "Plots/combined_inference_logit"
-dir.create(pooled_logit_dir, recursive = TRUE, showWarnings = FALSE)
+saveRDS(pooled_results_logit, "Plots/combined_inference/pooled_results_logit.rds")
+```
+
+```{r table-pooled-logit}
+
+pooled_results_logit <- readRDS("Plots/combined_inference/pooled_results_logit.rds")
+pooled_logit_dir <- "Plots/combined_inference"
 
 write_csv(pooled_results_logit$combined_paper_table, file.path(pooled_logit_dir, "combined_logit_paper_table.csv"))
 
-pooled_logit_latex <- combined_pooled_table_to_latex(pooled_results_logit$combined_paper_table)
+pooled_logit_latex <- combined_pooled_table_logit_to_latex(pooled_results_logit$combined_paper_table, pooled_results_logit$model_level_labels)
 writeLines(pooled_logit_latex, file.path(pooled_logit_dir, "combined_logit_latex_rows.txt"))
 
-pooled_logit_standalone_tex <- combined_pooled_table_to_standalone_tex(
+pooled_logit_standalone_tex <- combined_pooled_table_logit_to_standalone_tex(
   pooled_results_logit$combined_paper_table,
+  model_level_labels = pooled_results_logit$model_level_labels,
   reference_label = pooled_results_logit$reference_label
 )
 writeLines(pooled_logit_standalone_tex, file.path(pooled_logit_dir, "combined_logit_standalone.tex"))

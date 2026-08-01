@@ -1,0 +1,12 @@
+Joint: OL first & 0.801*** & 0.006 & 0.404*** & 0.007 \\
+Joint: HS first & 0.803*** & 0.006 & 0.356*** & 0.007 \\
+Separate Labeling & 0.802*** & 0.006 & 0.355*** & 0.007 \\
+Batch Prompt (vs. Indiv. Prompts) & -0.053*** & 0.001 & -0.042*** & 0.002 \\
+With Confidence (vs. Without) & 0.028*** & 0.001 & 0.010*** & 0.002 \\
+$\sigma^2$ & 0.045 & -- & 0.071 & -- \\
+$\tau_{00}$\textsubscript{tweet\_id} & 0.120 & -- & 0.157 & -- \\
+ICC & 0.727 & -- & 0.688 & -- \\
+$N$\textsubscript{tweet\_id} &   3,000 & -- &   3,000 & -- \\
+Observations & 108,000 & -- & 108,000 & -- \\
+Marginal $R^2$ & 0.005 & -- & 0.004 & -- \\
+Conditional $R^2$ & 0.728 & -- & 0.689 & -- \\
