@@ -60,7 +60,6 @@
         TRUE           ~ ""
       ),
       term_clean = case_when(
-        term == "(Intercept)" ~ "Separate Labeling",
         term == "ol_first"    ~ "Joint: OL first (vs. Separate Labeling)",
         term == "hs_first"    ~ "Joint: HS first (vs. Separate Labeling)",
         term == "batch1"      ~ "Batch Prompt (vs. Indiv. Prompts)",
@@ -216,7 +215,7 @@ fit_pooled_base <- function(
   model_level_labels <- unname(model_labels[setdiff(model_keys, reference_model)])
 
   row_order <- c(
-    "Separate Labeling",
+    "(Intercept)",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)",
     "With Confidence (vs. Without)",
@@ -314,7 +313,7 @@ fit_pooled_interaction <- function(base, n_cores = base$n_cores) {
   )
 
   interaction_row_order <- c(
-    "Separate Labeling",
+    "(Intercept)",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)",
     "With Confidence (vs. Without)",
@@ -401,7 +400,6 @@ fit_pooled_design_interaction <- function(base, n_cores = base$n_cores) {
           TRUE           ~ ""
         ),
         term_clean = case_when(
-          term == "(Intercept)" ~ "Separate Labeling",
           term == "ol_first"    ~ "Joint: OL first (vs. Separate Labeling)",
           term == "hs_first"    ~ "Joint: HS first (vs. Separate Labeling)",
           term == "batch1"      ~ "Batch Prompt (vs. Indiv. Prompts)",
@@ -425,7 +423,7 @@ fit_pooled_design_interaction <- function(base, n_cores = base$n_cores) {
   )
 
   designinteraction_row_order <- c(
-    "Separate Labeling",
+    "(Intercept)",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)",
     "With Confidence (vs. Without)",
@@ -512,7 +510,6 @@ fit_pooled_random_slopes <- function(base) {
           TRUE           ~ ""
         ),
         term_clean = case_when(
-          term == "(Intercept)" ~ "Separate Labeling",
           term == "ol_first"    ~ "Joint: OL first (vs. Separate Labeling)",
           term == "hs_first"    ~ "Joint: HS first (vs. Separate Labeling)",
           term == "batch"       ~ "Batch Prompt (vs. Indiv. Prompts)",
@@ -530,7 +527,7 @@ fit_pooled_random_slopes <- function(base) {
   )
 
   combined_row_order_rs <- c(
-    "Separate Labeling",
+    "(Intercept)",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)",
     "With Confidence (vs. Without)",
@@ -767,7 +764,7 @@ combine_pooled_results <- function(base, interaction, design_interaction, random
   # models run regardless of family. Interaction = model x Asked First (task
   # structure); DesignInteraction = model x Batch + model x Confidence.
   combined_row_order <- c(
-    "Separate Labeling",
+    "(Intercept)",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)",
     "With Confidence (vs. Without)",
@@ -937,7 +934,7 @@ combine_pooled_results_base_only <- function(base) {
   fixed_table <- base$fixed_table
 
   combined_row_order <- c(
-    "Separate Labeling",
+    "(Intercept)",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)",
     "With Confidence (vs. Without)",
@@ -1053,7 +1050,7 @@ combine_pooled_results_base_only <- function(base) {
   )
 }
 
-combined_pooled_table_base_to_latex <- function(combined, model_level_labels) {
+combined_pooled_table_base_to_latex <- function(combined, model_level_labels, reference_label = NULL) {
 
   library(tidyverse)
 
@@ -1069,10 +1066,17 @@ combined_pooled_table_base_to_latex <- function(combined, model_level_labels) {
     paste(c(term, vals), collapse = " & ")
   }
 
-  subheader <- function(label) paste0("\\multicolumn{5}{l}{\\textbf{", label, "}} \\\\")
+  # suffix (e.g. "vs. GPT-4o mini") is appended outside \textbf so it reads as
+  # a plain-text qualifier on the bolded section label, not part of the heading itself
+  subheader <- function(label, suffix = NULL) {
+    paste0(
+      "\\multicolumn{5}{l}{\\textbf{", label, "}",
+      if (!is.null(suffix)) paste0(" (", suffix, ")") else "",
+      "} \\\\"
+    )
+  }
 
   task_terms <- c(
-    "Separate Labeling",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)"
   )
@@ -1081,11 +1085,14 @@ combined_pooled_table_base_to_latex <- function(combined, model_level_labels) {
   random_effect_terms <- c("$\\tau_{00}$\\textsubscript{tweet\\_id}")
   model_stats_terms <- c("ICC", "Marginal $R^2$", "Conditional $R^2$", "AIC", "BIC")
 
+  model_suffix <- if (!is.null(reference_label)) paste0("vs. ", reference_label) else NULL
+
   body <- c(
+    paste0(row_fmt("(Intercept)"), " \\\\"),
     subheader("Task Structure Effects"),
     paste0(map_chr(task_terms, row_fmt), " \\\\"),
     paste0(map_chr(design_terms, row_fmt), " \\\\"),
-    subheader("Model Fixed Effects"),
+    subheader("Model Fixed Effects", model_suffix),
     paste0(map_chr(model_terms, row_fmt), " \\\\"),
     subheader("Random Effects"),
     paste0(map_chr(random_effect_terms, row_fmt), " \\\\"),
@@ -1098,7 +1105,7 @@ combined_pooled_table_base_to_latex <- function(combined, model_level_labels) {
 
 combined_pooled_table_base_to_standalone_tex <- function(combined, model_level_labels, reference_label = NULL) {
 
-  body_rows <- combined_pooled_table_base_to_latex(combined, model_level_labels)
+  body_rows <- combined_pooled_table_base_to_latex(combined, model_level_labels, reference_label)
 
   header <- paste(
     c("Term", "OL Task", "OL Models", "HS Task", "HS Models"),
@@ -1111,23 +1118,12 @@ combined_pooled_table_base_to_standalone_tex <- function(combined, model_level_l
   note <- c(
     "\\smallskip",
     paste0(
-      "\\footnotesize \\textit{Note}: All models: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
+      "\\footnotesize \\textit{Note}: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
       "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
-      "All specifications include an intercept, with Separate Labeling as the reference task-structure category. ",
-      "Task omits the per-model fixed effect (pooled average, ignoring model identity). ",
-      "Model $\\times$ Task Structure and Model $\\times$ Batch/Confidence interaction specifications are omitted."
+      "(Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models columns); Task pools across models. ",
+      "Model $\\times$ Task and Model $\\times$ Batch/Confidence interactions are not shown here."
     )
   )
-
-  if (!is.null(reference_label)) {
-    note <- c(
-      note,
-      paste0(
-        "\\footnotesize \"Model:\" rows are estimated relative to ",
-        reference_label, ", the reference model."
-      )
-    )
-  }
 
   c(
     "\\documentclass{article}",
@@ -1171,7 +1167,7 @@ run_pooled_analysis <- function(
 
   combine_pooled_results(base, interaction, design_interaction, random_slopes)
 }
-combined_pooled_table_to_latex <- function(combined, model_level_labels) {
+combined_pooled_table_to_latex <- function(combined, model_level_labels, reference_label = NULL) {
 
   library(tidyverse)
 
@@ -1187,10 +1183,15 @@ combined_pooled_table_to_latex <- function(combined, model_level_labels) {
     paste(c(term, vals), collapse = " & ")
   }
 
-  subheader <- function(label) paste0("\\multicolumn{9}{l}{\\textbf{", label, "}} \\\\")
+  subheader <- function(label, suffix = NULL) {
+    paste0(
+      "\\multicolumn{9}{l}{\\textbf{", label, "}",
+      if (!is.null(suffix)) paste0(" (", suffix, ")") else "",
+      "} \\\\"
+    )
+  }
 
   task_terms <- c(
-    "Separate Labeling",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)"
   )
@@ -1202,11 +1203,14 @@ combined_pooled_table_to_latex <- function(combined, model_level_labels) {
   random_effect_terms <- c("$\\tau_{00}$\\textsubscript{tweet\\_id}")
   model_stats_terms   <- c("ICC", "Marginal $R^2$", "Conditional $R^2$", "AIC", "BIC")
 
+  model_suffix <- if (!is.null(reference_label)) paste0("vs. ", reference_label) else NULL
+
   body <- c(
+    paste0(row_fmt("(Intercept)"), " \\\\"),
     subheader("Task Structure Effects"),
     paste0(map_chr(task_terms, row_fmt), " \\\\"),
     paste0(map_chr(design_terms, row_fmt), " \\\\"),
-    subheader("Model Fixed Effects"),
+    subheader("Model Fixed Effects", model_suffix),
     paste0(map_chr(model_terms, row_fmt), " \\\\"),
     subheader("Model $\\times$ Task Structure Interaction"),
     paste0(map_chr(model_int_terms, row_fmt), " \\\\"),
@@ -1224,7 +1228,7 @@ combined_pooled_table_to_latex <- function(combined, model_level_labels) {
 
 combined_pooled_table_to_standalone_tex <- function(combined, model_level_labels, reference_label = NULL) {
 
-  body_rows <- combined_pooled_table_to_latex(combined, model_level_labels)
+  body_rows <- combined_pooled_table_to_latex(combined, model_level_labels, reference_label)
 
   header <- paste(
     c(
@@ -1241,22 +1245,11 @@ combined_pooled_table_to_standalone_tex <- function(combined, model_level_labels
   note <- c(
     "\\smallskip",
     paste0(
-      "\\footnotesize \\textit{Note}: All models: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
+      "\\footnotesize \\textit{Note}: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
       "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
-      "All specifications include an intercept, with Separate Labeling as the reference task-structure category. ",
-      "Task omits the per-model fixed effect (pooled average, ignoring model identity)."
+      "(Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models/Interaction columns); Task pools across models."
     )
   )
-
-  if (!is.null(reference_label)) {
-    note <- c(
-      note,
-      paste0(
-        "\\footnotesize \"Model:\" rows are estimated relative to ",
-        reference_label, ", the reference model."
-      )
-    )
-  }
 
   c(
     "\\documentclass{article}",
@@ -1281,7 +1274,7 @@ combined_pooled_table_to_standalone_tex <- function(combined, model_level_labels
   )
 }
 
-combined_pooled_table_randomslopes_to_latex <- function(combined, model_level_labels) {
+combined_pooled_table_randomslopes_to_latex <- function(combined, model_level_labels, reference_label = NULL) {
 
   library(tidyverse)
 
@@ -1297,10 +1290,15 @@ combined_pooled_table_randomslopes_to_latex <- function(combined, model_level_la
     paste(c(term, vals), collapse = " & ")
   }
 
-  subheader <- function(label) paste0("\\multicolumn{7}{l}{\\textbf{", label, "}} \\\\")
+  subheader <- function(label, suffix = NULL) {
+    paste0(
+      "\\multicolumn{7}{l}{\\textbf{", label, "}",
+      if (!is.null(suffix)) paste0(" (", suffix, ")") else "",
+      "} \\\\"
+    )
+  }
 
   task_terms <- c(
-    "Separate Labeling",
     "Joint: OL first (vs. Separate Labeling)",
     "Joint: HS first (vs. Separate Labeling)"
   )
@@ -1311,11 +1309,14 @@ combined_pooled_table_randomslopes_to_latex <- function(combined, model_level_la
   model_stats_terms   <- c("ICC", "Marginal $R^2$", "Conditional $R^2$", "AIC", "BIC")
   lrt_terms <- combined$term_clean[str_starts(combined$term_clean, "LRT")]
 
+  model_suffix <- if (!is.null(reference_label)) paste0("vs. ", reference_label) else NULL
+
   body <- c(
+    paste0(row_fmt("(Intercept)"), " \\\\"),
     subheader("Task Structure Effects"),
     paste0(map_chr(task_terms, row_fmt), " \\\\"),
     paste0(map_chr(design_terms, row_fmt), " \\\\"),
-    subheader("Model Fixed Effects"),
+    subheader("Model Fixed Effects", model_suffix),
     paste0(map_chr(model_terms, row_fmt), " \\\\"),
     subheader("Cross-Model Variance Components"),
     paste0(map_chr(variance_terms, row_fmt), " \\\\"),
@@ -1331,7 +1332,7 @@ combined_pooled_table_randomslopes_to_latex <- function(combined, model_level_la
 
 combined_pooled_table_randomslopes_to_standalone_tex <- function(combined, model_level_labels, reference_label = NULL) {
 
-  body_rows <- combined_pooled_table_randomslopes_to_latex(combined, model_level_labels)
+  body_rows <- combined_pooled_table_randomslopes_to_latex(combined, model_level_labels, reference_label)
 
   header <- paste(
     c("Term", "OL Task", "OL Models", "OL Random Slopes", "HS Task", "HS Models", "HS Random Slopes"),
@@ -1344,24 +1345,12 @@ combined_pooled_table_randomslopes_to_standalone_tex <- function(combined, model
   note <- c(
     "\\smallskip",
     paste0(
-      "\\footnotesize \\textit{Note}: All models: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
+      "\\footnotesize \\textit{Note}: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
       "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
-      "All specifications include an intercept, with Separate Labeling as the reference task-structure category. ",
-      "Task omits the per-model fixed effect (pooled average, ignoring model identity); ",
-      "Random Slopes adds the same per-model fixed effect as Models plus uncorrelated random slopes for task structure, batch, and confidence across models. ",
-      "LRT tests Random Slopes against Models (same fixed effects, REML)."
+      "(Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models/Random Slopes columns); Task pools across models. ",
+      "Random Slopes adds uncorrelated per-model random slopes for task structure, batch, and confidence to the Models specification; LRT tests it against Models (REML)."
     )
   )
-
-  if (!is.null(reference_label)) {
-    note <- c(
-      note,
-      paste0(
-        "\\footnotesize \"Model:\" rows (Models and Random Slopes columns) are estimated relative to ",
-        reference_label, ", the reference model."
-      )
-    )
-  }
 
   c(
     "\\documentclass{article}",
@@ -1389,13 +1378,13 @@ combined_pooled_table_randomslopes_to_standalone_tex <- function(combined, model
 # combined_paper_table now has the same 4-spec shape (NoModel/Main/Interaction/
 # DesignInteraction) for both families, so these just delegate to the shared
 # implementation - kept as separate names since main.Rmd calls them for the logit table.
-combined_pooled_table_logit_to_latex <- function(combined, model_level_labels) {
-  combined_pooled_table_to_latex(combined, model_level_labels)
+combined_pooled_table_logit_to_latex <- function(combined, model_level_labels, reference_label = NULL) {
+  combined_pooled_table_to_latex(combined, model_level_labels, reference_label)
 }
 
 combined_pooled_table_logit_to_standalone_tex <- function(combined, model_level_labels, reference_label = NULL) {
 
-  body_rows <- combined_pooled_table_logit_to_latex(combined, model_level_labels)
+  body_rows <- combined_pooled_table_logit_to_latex(combined, model_level_labels, reference_label)
 
   header <- paste(
     c(
@@ -1412,22 +1401,11 @@ combined_pooled_table_logit_to_standalone_tex <- function(combined, model_level_
   note <- c(
     "\\smallskip",
     paste0(
-      "\\footnotesize \\textit{Note}: All models: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
+      "\\footnotesize \\textit{Note}: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
       "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
-      "All specifications include an intercept, with Separate Labeling as the reference task-structure category. ",
-      "Task omits the per-model fixed effect (pooled average, ignoring model identity)."
+      "(Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models/Interaction columns); Task pools across models."
     )
   )
-
-  if (!is.null(reference_label)) {
-    note <- c(
-      note,
-      paste0(
-        "\\footnotesize \"Model:\" rows are estimated relative to ",
-        reference_label, ", the reference model."
-      )
-    )
-  }
 
   c(
     "\\documentclass{article}",
