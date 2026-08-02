@@ -618,17 +618,69 @@ pooled_results$combined_paper_table_randomslopes
 
 ## Table -- Pooled Models, Mixed-Effects Logistic Regression
 
-```{r pooled-logit-fit}
+```{r pooled-logit-fit-base}
 
 load("model_data.RData")
 
-pooled_results_logit <- run_pooled_analysis(
+pooled_logit_base <- fit_pooled_base(
   model_dfs    = model_dfs,
   model_labels = model_labels,
   family       = "binomial"
 )
 
+saveRDS(pooled_logit_base, "Plots/combined_inference/pooled_logit_base.rds")
+rm(model_dfs); gc()
+```
+
+```{r table-pooled-logit-base-only}
+
+pooled_logit_base <- readRDS("Plots/combined_inference/pooled_logit_base.rds")
+pooled_logit_dir <- "Plots/combined_inference"
+
+pooled_results_logit_base_only <- combine_pooled_results_base_only(pooled_logit_base)
+
+pooled_logit_base_only_standalone_tex <- combined_pooled_table_base_to_standalone_tex(
+  pooled_results_logit_base_only$combined_paper_table,
+  model_level_labels = pooled_results_logit_base_only$model_level_labels,
+  reference_label = pooled_results_logit_base_only$reference_label
+)
+writeLines(pooled_logit_base_only_standalone_tex, file.path(pooled_logit_dir, "combined_logit_base_only_standalone.tex"))
+```
+
+```{r pooled-logit-fit-interaction}
+
+pooled_logit_base <- readRDS("Plots/combined_inference/pooled_logit_base.rds")
+
+pooled_logit_interaction <- fit_pooled_interaction(pooled_logit_base, n_cores = 2)
+
+saveRDS(pooled_logit_interaction, "Plots/combined_inference/pooled_logit_interaction.rds")
+rm(pooled_logit_base, pooled_logit_interaction); gc()
+```
+
+```{r pooled-logit-fit-designinteraction}
+
+pooled_logit_base <- readRDS("Plots/combined_inference/pooled_logit_base.rds")
+
+pooled_logit_designinteraction <- fit_pooled_design_interaction(pooled_logit_base, n_cores = 2)
+
+saveRDS(pooled_logit_designinteraction, "Plots/combined_inference/pooled_logit_designinteraction.rds")
+rm(pooled_logit_base, pooled_logit_designinteraction); gc()
+```
+
+```{r pooled-logit-combine}
+
+pooled_logit_base <- readRDS("Plots/combined_inference/pooled_logit_base.rds")
+pooled_logit_interaction <- readRDS("Plots/combined_inference/pooled_logit_interaction.rds")
+pooled_logit_designinteraction <- readRDS("Plots/combined_inference/pooled_logit_designinteraction.rds")
+
+pooled_results_logit <- combine_pooled_results(
+  base               = pooled_logit_base,
+  interaction        = pooled_logit_interaction,
+  design_interaction = pooled_logit_designinteraction
+)
+
 saveRDS(pooled_results_logit, "Plots/combined_inference/pooled_results_logit.rds")
+rm(pooled_logit_base, pooled_logit_interaction, pooled_logit_designinteraction); gc()
 ```
 
 ```{r table-pooled-logit}
