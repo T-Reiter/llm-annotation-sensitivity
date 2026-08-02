@@ -347,8 +347,10 @@ ggsave(
 prevalence_heatmap_stacked <- prevalence_heatmap +
   facet_wrap(~ facet_label, ncol = 1, scales = "free_x") +
   theme(
-    axis.text.x = element_text(size = 7, lineheight = 0.85)
-  )
+    axis.text.x    = element_text(size = 7, lineheight = 0.85),
+    legend.position = "bottom"
+  ) +
+  guides(fill = guide_colorbar(title.position = "top", barwidth = unit(6, "cm")))
 
 prevalence_heatmap_stacked
 
@@ -415,6 +417,8 @@ ggsave(
 )
 ```
 
+### Flipped Axis, Stacked
+
 ```{r prevalence-heatmap-flipped-stacked, fig.width=6.5, fig.height=14}
 
 ### Spelled-out condition labels, just for this (roomier) version
@@ -436,9 +440,13 @@ prevalence_heatmap_flipped_stacked <- prevalence_heatmap_flipped +
   facet_wrap(~ facet_label, ncol = 1, scales = "free_x") +
   scale_y_discrete(labels = x_label_long_map) +
   theme(
-    axis.text.x = element_text(size = 7.5, angle = 30, hjust = 1),
-    axis.text.y = element_text(size = 6.5, lineheight = 1.0)
-  )
+    axis.text.x    = element_text(size = 7.5, angle = 30, hjust = 1),
+    axis.text.y    = element_text(size = 6.5, lineheight = 1.0),
+    legend.position = "bottom"
+  ) +
+  guides(fill = guide_colorbar(
+    title.position = "top", barwidth = unit(6, "cm")
+  ))
 
 prevalence_heatmap_flipped_stacked
 
@@ -506,6 +514,10 @@ prevalence_heatmap_model_mean_stacked <- ggplot(
 
   labs(x = NULL, y = NULL) +
 
+  guides(fill = guide_colorbar(
+    title.position = "top", barwidth = unit(6, "cm")
+  )) +
+
   theme_minimal(base_size = 9) +
   theme(
     panel.grid       = element_blank(),
@@ -513,7 +525,7 @@ prevalence_heatmap_model_mean_stacked <- ggplot(
     strip.text       = element_text(face = "bold", size = 10),
     axis.text.x      = element_text(size = 7.5, angle = 30, hjust = 1),
     axis.text.y      = element_text(size = 6.5, lineheight = 1.0),
-    legend.position  = "right"
+    legend.position  = "bottom"
   )
 
 prevalence_heatmap_model_mean_stacked
