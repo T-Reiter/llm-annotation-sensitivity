@@ -127,11 +127,14 @@ wide_table_to_standalone_tex <- function(wide, model_labels, models_per_block = 
     missing_phrase <- if (total_missing == 1) "a missing response" else "missing responses"
     note <- c(
       "\\smallskip",
+      "\\begin{minipage}{\\textwidth}",
+      "\\raggedright",
       paste0(
         "\\footnotesize \\textit{Note}: Observations = ", format(typical_n, big.mark = ","),
         " per model, except ", paste(detail, collapse = "; "),
         ", due to ", missing_phrase, "."
-      )
+      ),
+      "\\end{minipage}"
     )
   }
 

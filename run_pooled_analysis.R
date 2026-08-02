@@ -1117,12 +1117,15 @@ combined_pooled_table_base_to_standalone_tex <- function(combined, model_level_l
 
   note <- c(
     "\\smallskip",
+    "\\begin{minipage}{\\textwidth}",
+    "\\raggedright",
     paste0(
       "\\footnotesize \\textit{Note}: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
       "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
       "(Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models columns); Task pools across models. ",
       "Model $\\times$ Task and Model $\\times$ Batch/Confidence interactions are not shown here."
-    )
+    ),
+    "\\end{minipage}"
   )
 
   c(
@@ -1244,11 +1247,14 @@ combined_pooled_table_to_standalone_tex <- function(combined, model_level_labels
 
   note <- c(
     "\\smallskip",
+    "\\begin{minipage}{\\textwidth}",
+    "\\raggedright",
     paste0(
       "\\footnotesize \\textit{Note}: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
       "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
       "(Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models/Interaction columns); Task pools across models."
-    )
+    ),
+    "\\end{minipage}"
   )
 
   c(
@@ -1344,12 +1350,15 @@ combined_pooled_table_randomslopes_to_standalone_tex <- function(combined, model
 
   note <- c(
     "\\smallskip",
+    "\\begin{minipage}{\\textwidth}",
+    "\\raggedright",
     paste0(
       "\\footnotesize \\textit{Note}: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
       "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
       "(Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models/Random Slopes columns); Task pools across models. ",
       "Random Slopes adds uncorrelated per-model random slopes for task structure, batch, and confidence to the Models specification; LRT tests it against Models (REML)."
-    )
+    ),
+    "\\end{minipage}"
   )
 
   c(
@@ -1400,11 +1409,14 @@ combined_pooled_table_logit_to_standalone_tex <- function(combined, model_level_
 
   note <- c(
     "\\smallskip",
+    "\\begin{minipage}{\\textwidth}",
+    "\\raggedright",
     paste0(
       "\\footnotesize \\textit{Note}: $N$\\textsubscript{tweet\\_id} = ", n_tweet,
       "; Observations = ", obs, ". *** $p<.001$, ** $p<.01$, * $p<.05$. ",
       "(Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models/Interaction columns); Task pools across models."
-    )
+    ),
+    "\\end{minipage}"
   )
 
   c(

@@ -1,5 +1,5 @@
 term_clean,OL_NoModel_estimate_fmt,OL_NoModel_se_fmt,OL_Main_estimate_fmt,OL_Main_se_fmt,OL_Interaction_estimate_fmt,OL_Interaction_se_fmt,OL_DesignInteraction_estimate_fmt,OL_DesignInteraction_se_fmt,HS_NoModel_estimate_fmt,HS_NoModel_se_fmt,HS_Main_estimate_fmt,HS_Main_se_fmt,HS_Interaction_estimate_fmt,HS_Interaction_se_fmt,HS_DesignInteraction_estimate_fmt,HS_DesignInteraction_se_fmt
-Separate Labeling,0.794***,0.006,0.765***,0.006,0.758***,0.006,0.748***,0.006,0.322***,0.006,0.389***,0.007,0.384***,0.007,0.399***,0.007
+(Intercept),0.794***,0.006,0.765***,0.006,0.758***,0.006,0.748***,0.006,0.322***,0.006,0.389***,0.007,0.384***,0.007,0.399***,0.007
 Joint: OL first (vs. Separate Labeling),0.027***,0.001,0.027***,0.001,0.048***,0.002,0.027***,0.001,0.023***,0.001,0.023***,0.001,0.023***,0.001,0.023***,0.001
 Joint: HS first (vs. Separate Labeling),0.011***,0.001,0.011***,0.001,0.011***,0.001,0.011***,0.001,-0.007***,0.001,-0.007***,0.001,0.006**,0.002,-0.007***,0.001
 With Confidence (vs. Without),0.023***,0.001,0.023***,0.001,0.023***,0.001,0.043***,0.002,-0.010***,0.001,-0.010***,0.001,-0.010***,0.001,0.020***,0.002

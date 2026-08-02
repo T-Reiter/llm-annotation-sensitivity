@@ -10,13 +10,13 @@
 \toprule
 Term & OL Task & OL Models & HS Task & HS Models \\
 \midrule
+(Intercept) & 2.608*** & 2.233*** & -1.785*** & -1.117*** \\
 \multicolumn{5}{l}{\textbf{Task Structure Effects}} \\
-Separate Labeling & 2.608*** & 2.233*** & -1.785*** & -1.117*** \\
 Joint: OL first (vs. Separate Labeling) & 0.402*** & 0.417*** & 0.235*** & 0.257*** \\
 Joint: HS first (vs. Separate Labeling) & 0.156*** & 0.162*** & -0.075*** & -0.083*** \\
 With Confidence (vs. Without) & 0.338*** & 0.351*** & -0.105*** & -0.115*** \\
 Batch Prompt (vs. Indiv. Prompts) & -0.882*** & -0.917*** & 0.191*** & 0.210*** \\
-\multicolumn{5}{l}{\textbf{Model Fixed Effects}} \\
+\multicolumn{5}{l}{\textbf{Model Fixed Effects} (vs. GPT-4o mini)} \\
 GPT-5.4 & -- & -0.080*** & -- & -2.472*** \\
 Mistral Large 3 & -- & 1.425*** & -- & -0.722*** \\
 Mistral Medium 3.5 & -- & 0.562*** & -- & -0.786*** \\
@@ -35,7 +35,9 @@ BIC & 357322.8 & 344911.0 & 481036.1 & 444914.6 \\
 \end{tabular}%
 }
 \smallskip
-\footnotesize \textit{Note}: All models: $N$\textsubscript{tweet\_id} = 3,000; Observations = 755,999. *** $p<.001$, ** $p<.01$, * $p<.05$. All specifications include an intercept, with Separate Labeling as the reference task-structure category. Task omits the per-model fixed effect (pooled average, ignoring model identity). Model $\times$ Task Structure and Model $\times$ Batch/Confidence interaction specifications are omitted.
-\footnotesize "Model:" rows are estimated relative to GPT-4o mini, the reference model.
+\begin{minipage}{\textwidth}
+\raggedright
+\footnotesize \textit{Note}: $N$\textsubscript{tweet\_id} = 3,000; Observations = 755,999. *** $p<.001$, ** $p<.01$, * $p<.05$. (Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models columns); Task pools across models. Model $\times$ Task and Model $\times$ Batch/Confidence interactions are not shown here.
+\end{minipage}
 \end{table}
 \end{document}

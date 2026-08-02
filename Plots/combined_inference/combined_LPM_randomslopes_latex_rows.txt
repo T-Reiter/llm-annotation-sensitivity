@@ -1,5 +1,5 @@
+(Intercept) & 0.794*** & 0.765*** & 0.722*** & 0.322*** & 0.389*** & 0.434*** \\
 \multicolumn{7}{l}{\textbf{Task Structure Effects}} \\
-Separate Labeling & 0.794*** & 0.765*** & 0.722*** & 0.322*** & 0.389*** & 0.434*** \\
 Joint: OL first (vs. Separate Labeling) & 0.027*** & 0.027*** & 0.027 & 0.023*** & 0.023*** & 0.023 \\
 Joint: HS first (vs. Separate Labeling) & 0.011*** & 0.011*** & 0.011 & -0.007*** & -0.007*** & -0.007 \\
 With Confidence (vs. Without) & 0.023*** & 0.023*** & 0.023* & -0.010*** & -0.010*** & -0.010 \\

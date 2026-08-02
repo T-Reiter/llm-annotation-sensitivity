@@ -10,13 +10,13 @@
 \toprule
 Term & OL Task & OL Models & OL Random Slopes & HS Task & HS Models & HS Random Slopes \\
 \midrule
+(Intercept) & 0.794*** & 0.765*** & 0.722*** & 0.322*** & 0.389*** & 0.434*** \\
 \multicolumn{7}{l}{\textbf{Task Structure Effects}} \\
-Separate Labeling & 0.794*** & 0.765*** & 0.722*** & 0.322*** & 0.389*** & 0.434*** \\
 Joint: OL first (vs. Separate Labeling) & 0.027*** & 0.027*** & 0.027 & 0.023*** & 0.023*** & 0.023 \\
 Joint: HS first (vs. Separate Labeling) & 0.011*** & 0.011*** & 0.011 & -0.007*** & -0.007*** & -0.007 \\
 With Confidence (vs. Without) & 0.023*** & 0.023*** & 0.023* & -0.010*** & -0.010*** & -0.010 \\
 Batch Prompt (vs. Indiv. Prompts) & -0.059*** & -0.059*** & -0.059 & 0.018*** & 0.018*** & 0.018 \\
-\multicolumn{7}{l}{\textbf{Model Fixed Effects}} \\
+\multicolumn{7}{l}{\textbf{Model Fixed Effects} (vs. GPT-4o mini)} \\
 GPT-5.4 & -- & -0.006*** & 0.029*** & -- & -0.212*** & -0.264*** \\
 Mistral Large 3 & -- & 0.087*** & 0.109*** & -- & -0.066*** & -0.192*** \\
 Mistral Medium 3.5 & -- & 0.037*** & 0.069*** & -- & -0.071*** & -0.094*** \\
@@ -42,7 +42,9 @@ LRT $p$ & -- & -- & <.001 & -- & -- & <.001 \\
 \end{tabular}%
 }
 \smallskip
-\footnotesize \textit{Note}: All models: $N$\textsubscript{tweet\_id} = 3,000; Observations = 755,999. *** $p<.001$, ** $p<.01$, * $p<.05$. All specifications include an intercept, with Separate Labeling as the reference task-structure category. Task omits the per-model fixed effect (pooled average, ignoring model identity); Random Slopes adds the same per-model fixed effect as Models plus uncorrelated random slopes for task structure, batch, and confidence across models. LRT tests Random Slopes against Models (same fixed effects, REML).
-\footnotesize "Model:" rows (Models and Random Slopes columns) are estimated relative to GPT-4o mini, the reference model.
+\begin{minipage}{\textwidth}
+\raggedright
+\footnotesize \textit{Note}: $N$\textsubscript{tweet\_id} = 3,000; Observations = 755,999. *** $p<.001$, ** $p<.01$, * $p<.05$. (Intercept) is Separate Labeling at the reference batch/confidence levels (and reference model, in the Models/Random Slopes columns); Task pools across models. Random Slopes adds uncorrelated per-model random slopes for task structure, batch, and confidence to the Models specification; LRT tests it against Models (REML).
+\end{minipage}
 \end{table}
 \end{document}
