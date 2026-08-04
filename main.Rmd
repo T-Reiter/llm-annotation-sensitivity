@@ -540,6 +540,149 @@ ggsave(
 )
 ```
 
+## Agreement Analyses (Kappa Heatmaps, All Models)
+
+```{r agreement-analyses}
+source("R1c_Agreements_AllModels.R")
+
+load("tweets_data.RData")
+load("model_data.RData")
+
+agreement_results <- imap(model_dfs, function(df, key) {
+  df_long_model <- run_full_analysis(
+    combined_df   = df,
+    model_name    = key,
+    tweets_full   = tweets_full,
+    final_summary = final_summary
+  )$df_long
+
+  run_agreement_analysis(
+    df_long     = df_long_model,
+    model_name  = key,
+    tweets_full = tweets_full
+  )
+})
+
+df_agreement_all_models <- map_dfr(agreement_results, "heat_df") %>%
+  mutate(
+    model = factor(
+      model_name,
+      levels = model_keys,
+      labels = model_labels[model_keys]
+    )
+  )
+
+saveRDS(df_agreement_all_models, "df_agreement_all_models.rds")
+saveRDS(agreement_results, "agreement_results.rds")
+```
+
+```{r agreement-plot, fig.width=6.7, fig.height=8.7}
+
+df_agreement_all_models <- readRDS("df_agreement_all_models.rds")
+
+coolwarm <- colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdBu")))
+
+task_map <- c(A = "Joint, OL first", B = "Joint, HS first", C = "Separate")
+
+### nested condition labels: task name shown once per block, mode below it
+nested_cond_label <- function(x) {
+  task_p <- str_extract(x, "^[ABC]")
+  occ    <- ave(seq_along(x), task_p, FUN = seq_along)
+  mode_p <- case_when(
+    x == "gap"                 ~ "",
+    x == "reference_agreement" ~ "Ref.",
+    grepl("batch_conf", x)     ~ "batch+conf",
+    grepl("batch", x)          ~ "batch",
+    grepl("conf", x)           ~ "conf",
+    TRUE                       ~ "base"
+  )
+  task_disp <- ifelse(occ == 1 & !is.na(task_p), paste0(task_map[task_p], " "), "")
+  paste0(task_disp, mode_p)
+}
+
+agreement_heatmap_all_models <- ggplot(
+  df_agreement_all_models,
+  aes(x = col_cond, y = row_cond, fill = value)
+) +
+
+  geom_tile(colour = "white", linewidth = 0.25) +
+
+  geom_text(
+    aes(label = ifelse(is.na(value), "",
+                        sub("^(-?)0\\.", "\\1.", sprintf("%.2f", value)))),
+    size = 1.5
+  ) +
+
+  ### rows = model, columns = OL / HS
+  facet_grid(model ~ outcome) +
+
+  scale_y_discrete(limits = rev, labels = nested_cond_label) +
+  scale_x_discrete(labels = nested_cond_label) +
+
+  scale_fill_gradientn(
+    colours  = coolwarm(100),
+    limits   = c(0, 1),
+    na.value = "white",
+    name     = "Kappa"
+  ) +
+
+  labs(x = NULL, y = NULL) +
+
+  theme_minimal(base_size = 6) +
+  theme(
+    panel.grid      = element_blank(),
+    axis.text.x     = element_text(size = 4, angle = 90, hjust = 1, vjust = 0.5),
+    axis.text.y     = element_text(size = 4),
+    strip.text.y    = element_text(size = 5.5, face = "bold", angle = -90),
+    strip.text.x    = element_text(size = 6.5, face = "bold"),
+    panel.spacing   = unit(0.15, "lines"),
+    legend.position = "bottom",
+    legend.key.height = unit(0.25, "cm"),
+    legend.key.width  = unit(0.6, "cm"),
+    legend.title    = element_text(size = 6.5),
+    legend.text     = element_text(size = 5.5)
+  )
+
+agreement_heatmap_all_models
+
+### sized for ACL's double-column (\textwidth) figure, ~1 page tall
+ggsave(
+  "Plots/agreements_few_all_models.pdf",
+  agreement_heatmap_all_models,
+  device = cairo_pdf,
+  width  = 17,
+  height = 22,
+  units  = "cm"
+)
+```
+
+### Table -- Within-Condition Agreement Only (Diagonal)
+
+```{r agreement-diag-table}
+source("R1c_Agreements_AllModels.R")
+source("run_table_wide.R")
+
+load("model_data.RData")
+agreement_results <- readRDS("agreement_results.rds")
+
+table_agreement_diag_split <- build_agreement_diag_table_split(
+  agreement_results = agreement_results,
+  model_order        = model_keys,
+  model_labels       = model_labels
+)
+
+write_csv(table_agreement_diag_split$OL, "Plots/table_agreement_within_condition_OL.csv")
+write_csv(table_agreement_diag_split$HS, "Plots/table_agreement_within_condition_HS.csv")
+
+agreement_diag_standalone_tex <- agreement_diag_split_to_standalone_tex(
+  table_agreement_diag_split, model_labels[model_keys]
+)
+writeLines(agreement_diag_standalone_tex, "Plots/table_agreement_within_condition_standalone.tex")
+
+table_agreement_diag_split$OL
+table_agreement_diag_split$HS
+```
+
 ## Run Individual LPM Models
 
 ```{r lpm-models}
