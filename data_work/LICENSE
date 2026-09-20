@@ -1,0 +1,83 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+WHAT THIS COVERS
+----------------
+The LLM-generated annotations produced for "Reliable but Sensitive: Evaluating
+LLM Annotation Beyond Performance", and the files derived from them:
+
+  data_work/raw/**          model label files, one directory per model
+  data_work/processed/**    the unified long/aggregated analysis datasets,
+                            except kern_full.csv (see Third-party material)
+  data_work/outputs/**      derived tables and coefficient exports
+  plots/**                  derived figures
+
+You are free to share and adapt this material for any purpose, including
+commercially, provided you give appropriate credit, link to the license, and
+indicate if changes were made.
+
+  License text: https://creativecommons.org/licenses/by/4.0/legalcode
+  Summary:      https://creativecommons.org/licenses/by/4.0/
+
+Suggested attribution:
+
+  LLM annotation data from "Reliable but Sensitive: Evaluating LLM Annotation
+  Beyond Performance" (2026), CC BY 4.0.
+
+THIRD-PARTY MATERIAL
+--------------------
+1. Tweet text (the `tweet` column of data_work/processed/df_agg.csv and the
+   corresponding column of the raw label files).
+
+   These tweets come from the Davidson et al. (2017) hate-speech and offensive
+   language corpus, reaching this repository through the subsample annotated by
+   Kern et al. (2023):
+
+     https://github.com/t-davidson/hate-speech-and-offensive-language
+
+   That corpus is distributed under the MIT License, reproduced below, which
+   permits redistribution. Screen names have been masked and URLs removed in
+   the copies here. Copyright in the tweets themselves rests with their
+   authors, not with Davidson et al., and redistribution of tweet text (as
+   opposed to tweet IDs) may also be constrained by the platform's developer
+   terms; neither is altered by the MIT grant or by this file.
+
+   Cite the corpus as:
+
+     Davidson, T., Warmsley, D., Macy, M., & Weber, I. (2017). Automated Hate
+     Speech Detection and the Problem of Offensive Language. Proceedings of the
+     11th International AAAI Conference on Web and Social Media (ICWSM '17),
+     512-515.
+
+   ---------------------------------------------------------------------------
+   MIT License
+
+   Copyright (c) 2017 Tom Davidson
+
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in all
+   copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+   ---------------------------------------------------------------------------
+
+2. The Kern et al. (2023) human reference annotations, and the
+   processed/kern_full.csv built from them. Not redistributed in this
+   repository; obtain them from
+
+     https://huggingface.co/datasets/soda-lmu/tweet-annotation-sensitivity-2
+
+   and consult the terms stated there.
+
+3. All code in this repository, which is MIT licensed. See ../LICENSE.
