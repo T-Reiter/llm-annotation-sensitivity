@@ -1,127 +1,243 @@
-# Annotation Sensitivity Analysis — Data & Code Pipeline
+# Annotation Sensitivity — Data & Code Pipeline
 
-Reproducibility package for "Reliable but Sensitive: Evaluating LLM Annotation Beyond Performance"
-August 2026
+Reproducibility package for *"Reliable but Sensitive: Evaluating LLM Annotation
+Beyond Performance."*
 
-## Quick Start
+Everything in the paper except `method6.png` (a hand-drawn diagram of the prompt
+conditions) is produced by the R scripts in `src/`.
+
+## Quick start
+
+All paths are resolved from the repository root by the
+[`here`](https://here.r-lib.org/) package, so **run the scripts with the
+repository root as your working directory**. No path in this repository is
+absolute; a fresh clone or an unzipped release works unchanged.
+
+A clone contains the code, the raw LLM annotations (`raw/`) and the generated
+figures and tables. It does **not** contain `processed/` — every file there is
+rebuilt by `process_raw_data.R`. Rebuilding also needs the Kern et al. human
+annotations, which are not redistributed here; see *Input data* below for where
+to get them.
 
 ```bash
-cd data_work/
-USE_CACHE=1 Rscript src/run_from_raw.R
+cd /path/to/llm-annotation-sensitivity
+
+# 1. put the Kern et al. files in data_work/Tweets_CK/ (or set KERN_DATA_DIR)
+# 2. raw data -> processed data -> every table and figure in the paper:
+Rscript data_work/src/run_from_raw.R
+
+# same, but reuse any model fits already cached in outputs/cache/:
+USE_CACHE=1 Rscript data_work/src/run_from_raw.R
 ```
 
-This runs all 8 stages and produces every table and figure in the paper. Set `USE_CACHE=1` to skip raw-data processing when `processed/df_long.csv` already exists; omit it to rebuild from scratch.
+Once `processed/` exists you can re-run the analysis alone, without touching the
+raw data:
+
+```bash
+Rscript data_work/src/run_all.R                      # stages 01-08, cached fits
+PIPELINE_REFRESH=1 Rscript data_work/src/run_all.R   # force a full refit
+```
+
+`src/recreate_all_results.R` is a standalone alternative that recomputes the
+headline numbers from the processed data in a single process, without the
+caching or the LaTeX writers. It is a cross-check on `run_all.R`, not a
+replacement for it.
 
 ## Requirements
 
-- R ≥ 4.3
-- Packages: `tidyverse`, `lme4`, `irr`, `ggplot2`, `patchwork`, `xtable`, `arrow`
-- System: macOS or Linux; uses `grDevices::pdf()` for figures (no cairo dependency)
-
-Install missing packages:
+- R ≥ 4.1 (`02_regressions.R` uses the native `|>` pipe)
+- Packages: `here`, `tidyverse` (`dplyr`, `tidyr`, `readr`, `purrr`, `tibble`,
+  `ggplot2`), `data.table`, `lme4`, `lmerTest`, `lmtest`, `sandwich`, `pROC`,
+  `patchwork`
 
 ```r
-install.packages(c("tidyverse", "lme4", "irr", "patchwork", "xtable", "arrow"))
+install.packages(c("here", "tidyverse", "data.table", "lme4", "lmerTest",
+                   "lmtest", "sandwich", "pROC", "patchwork"))
 ```
 
-## Directory Structure
+Figures are written with `grDevices::pdf()` and `grDevices::png()`, so no cairo
+device is required.
+
+## Input data
+
+### LLM annotations — `raw/`
+
+36 CSVs across nine model directories. Folder names map to canonical model
+names in `process_raw_data.R`:
+
+| Folder | Model |
+|---|---|
+| `GPT4o_mini` | GPT-4o-mini |
+| `GPT5.4` | GPT-5.4 |
+| `GPT5.4_mini` | GPT-5.4-mini |
+| `GPT54_mini_run1_actually_4o_mini` | GPT-4o-mini_run2 |
+| `Llama3.1_8B_new` | Llama-3.1-8B |
+| `Llama3.1_70B_new` | Llama-3.1-70B |
+| `Llama4` | Llama-4 |
+| `MistralLarge3` | Mistral-Large-3 |
+| `MistralMedium3.5_new` | Mistral-Medium-3.5 |
+
+Seven of these are reported in the paper (`MODEL_ORDER` in `00_utils.R`).
+`GPT-4o-mini_run2` is a re-collection ten months later, used only for the
+temporal-drift check; `GPT-5.4-mini` is excluded from every reported result.
+
+Each model was run over 3,000 tweets in 16 conditions × 3 replicate runs. The
+16 conditions cross four task structures with batching and confidence
+elicitation:
+
+- `A` — joint call, offensive language asked first
+- `B` — joint call, hate speech asked first
+- `C.OL` — separate call, offensive language only
+- `C.HS` — separate call, hate speech only
+
+each optionally suffixed `_batch` (several tweets per API call) and `_conf`
+(confidence elicited alongside the label).
+
+### Tweet text — where it comes from
+
+The 3,000 tweets annotated here originate in the Davidson et al. (2017)
+hate-speech and offensive language corpus:
+
+> <https://github.com/t-davidson/hate-speech-and-offensive-language>
+
+They reach this repository through the subsample that Kern et al. (2023) had
+annotated by human coders. The corpus is MIT licensed, so the tweet text is
+redistributed here with Davidson et al.'s notice retained (see `LICENSE` in this
+directory). Screen names are masked and URLs are stripped in every copy. If you
+use this data, cite the original corpus:
+
+> Davidson, T., Warmsley, D., Macy, M., & Weber, I. (2017). Automated Hate
+> Speech Detection and the Problem of Offensive Language. *Proceedings of the
+> 11th International AAAI Conference on Web and Social Media* (ICWSM '17),
+> 512–515.
+
+Be aware of what the corpus contains: it was assembled to study hate speech and
+offensive language, and the tweet text is racist, sexist, homophobic and
+otherwise offensive throughout.
+
+### Human reference annotations — `Tweets_CK/` (not included)
+
+The Kern et al. (2023) human annotations of these tweets are **not**
+redistributed in this repository. Get them from:
+
+> <https://huggingface.co/datasets/soda-lmu/tweet-annotation-sensitivity-2>
+
+**The public release is larger than what this analysis uses.** It holds roughly
+89,000 annotations; the paper uses one slice of 44,900. Before running anything,
+reduce your download to a subset with this fingerprint:
+
+| | Expected |
+|---|---|
+| Annotations (rows, both files combined) | 44,900 |
+| Distinct tweets | 3,000 |
+| Distinct annotators | 917 |
+| Questionnaire versions | A, B, C, D, E |
+| Split | 33,683 train / 11,217 test |
+
+`process_raw_data.R` checks this before writing anything and prints what it
+found against what it expected, so a wrong subset fails immediately rather than
+producing quietly wrong numbers.
+
+The script expects the subset split across two CSVs, `full_train_s.csv` and
+`full_test_s.csv`, carrying at least these columns:
+
+| Column | Meaning |
+|---|---|
+| `tweet.id` | tweet identifier, joins to the LLM annotations |
+| `id` | annotator identifier |
+| `version` | questionnaire version the annotator saw |
+| `batch.tweet` | position of the tweet within the annotator's batch |
+| `hate.speech` | human hate-speech label |
+| `offensive.language` | human offensive-language label |
+| `tweet_hashed` | tweet text with screen names masked |
+
+The two files are concatenated into `processed/kern_full.csv`, and the script
+asserts the result has 44,900 rows. Put them in `data_work/Tweets_CK/`, or point
+the pipeline elsewhere:
+
+```bash
+KERN_DATA_DIR=/path/to/kern Rscript data_work/src/run_from_raw.R
+```
+
+Only `process_raw_data.R` reads them; the analysis stages use the processed
+`kern_full.csv`.
+
+## Directory layout
 
 ```
 data_work/
-├── README.md                 ← this file
-├── src/                      ← all analysis code
-│   ├── run_from_raw.R        ← single entry point (raw → paper)
-│   ├── run_all.R             ← orchestrator; checks all artifacts exist
-│   ├── 00_utils.R            ← shared helpers (crossed_prevalence_components, etc.)
-│   ├── process_raw_data.R    ← Stage 0: raw CSVs → processed data
-│   ├── 01_agreement.R        ← Stage 1: Krippendorff's α, pairwise agreement
-│   ├── 02_prevalence.R       ← Stage 2: prevalence estimates + Figure 1
-│   ├── 03_deff.R             ← Stage 3: crossed-REML variance decomposition → deff
-│   ├── 04_human_design.R     ← Stage 4: human benchmarks + framework table
-│   ├── 05_confidence.R       ← Stage 5: two-panel confidence figure
-│   ├── 06_figures.R          ← Stage 6: heatmaps, distributions, remaining plots
-│   ├── 07_tables.R           ← Stage 7: LaTeX table fragments
-│   └── 08_paper_tables.R     ← Stage 8: framework + cost tables
-├── raw/                      ← raw LLM annotation outputs (input data)
-│   ├── gpt4o/                ← 4 CSVs (conditions A, B, C + variants)
-│   ├── gpt4o-mini/
-│   ├── gpt4.1/
-│   ├── gpt4.1-mini/
-│   ├── gpt4.1-nano/
-│   ├── claude-sonnet/
-│   ├── claude-haiku/
-│   ├── llama4-scout/
-│   └── llama4-maverick/
-│       └── *.csv             ← 36 CSVs total across 9 model directories
-├── Tweets_CK/                ← Kern et al. human reference annotations
-│   └── *.csv
-├── processed/                ← generated intermediate data (gitignored or cached)
-│   ├── df_long.csv           ← long-format item × model × condition × run
-│   ├── df_agg.csv            ← aggregated prevalence by model × condition × run
-│   ├── kern_full.csv         ← processed Kern reference data
-│   └── prevalences.csv       ← final prevalence estimates with CIs
-└── outputs/                  ← generated LaTeX table fragments
-    ├── table_agreement.tex
-    ├── table_prevalence.tex
-    ├── table_deff.tex
-    ├── table_framework.tex
-    ├── table_cost.tex
-    ├── table_confidence.tex
-    ├── table_human.tex
-    ├── table_variance.tex
-    └── table_summary.tex
+├── README.md                  ← this file
+├── LICENSE                    ← CC BY 4.0 for the data (code is MIT, see ../LICENSE)
+├── raw/                       ← 36 LLM annotation CSVs in 9 model directories
+├── Tweets_CK/                 ← Kern et al. reference data (gitignored, not shipped)
+├── processed/                 ← built by process_raw_data.R (gitignored)
+│   ├── df_long.csv            ← tweet × condition × run × model, ~756k rows
+│   ├── df_agg.csv             ← modal labels per tweet × condition × model
+│   ├── prevalences.csv        ← prevalence per model × condition × run
+│   └── kern_full.csv          ← combined Kern reference annotations
+├── outputs/                   ← LaTeX fragments, coefficient exports, cache/
+└── src/                       ← all analysis code (old/ is an unused archive)
 
-plots/                        ← generated figures (sibling to data_work/)
-├── fig_prevalence.pdf
-├── fig_prevalence.png
-├── fig_confidence.pdf
-├── fig_confidence.png
-├── fig_heatmap_agreement.pdf
-├── fig_heatmap_agreement.png
-├── fig_distribution.pdf
-└── fig_distribution.png
+plots/                         ← generated figures, sibling to data_work/
 ```
 
-## Pipeline Stages
+Nothing in `processed/` is committed — all four files are rebuilt by
+`process_raw_data.R`, and `kern_full.csv` in particular is derived from data this
+repository does not redistribute. Stages 01–06 read `df_long.csv`; stage 04 also
+reads `kern_full.csv`. Run `process_raw_data.R` (or `run_from_raw.R`) before
+`run_all.R` on a fresh clone.
 
-| # | Script | What it produces |
-|---|--------|-----------------|
-| 0 | `process_raw_data.R` | `processed/df_long.csv`, `df_agg.csv`, `kern_full.csv` |
-| 1 | `01_agreement.R` | `outputs/table_agreement.tex` |
-| 2 | `02_prevalence.R` | `outputs/table_prevalence.tex`, `plots/fig_prevalence.*` |
-| 3 | `03_deff.R` | `outputs/table_deff.tex`, `outputs/table_variance.tex` |
-| 4 | `04_human_design.R` | `outputs/table_framework.tex`, `outputs/table_human.tex` |
-| 5 | `05_confidence.R` | `outputs/table_confidence.tex`, `plots/fig_confidence.*` |
-| 6 | `06_figures.R` | `plots/fig_heatmap_agreement.*`, `plots/fig_distribution.*` |
-| 7 | `07_tables.R` | `outputs/table_summary.tex` |
-| 8 | `08_paper_tables.R` | `outputs/table_cost.tex` (finalizes framework table) |
+## Pipeline stages
 
-## Key Methods
+`run_all.R` executes stages 01–08, each in its own R process, then verifies that
+every expected figure and table exists.
 
-### Crossed-REML variance decomposition (Stage 3)
+| # | Script | Tables / CSVs | Figures |
+|---|---|---|---|
+| 0 | `process_raw_data.R` | `processed/df_long.csv`, `df_agg.csv`, `prevalences.csv`, `kern_full.csv` | — |
+| 1 | `01_agreement.R` | `table_agreement_ladder.tex`, `ladder_{fleiss_within,cohen_across,cohen_human,icc,per_model}.csv` | `agreements_few_new_conditions_2x1` |
+| 2 | `02_regressions.R` | `table_taskeffects_all.tex`, `table_task_structure_glmer.tex`, `table_permodel.tex`, `permodel_coefs.csv`, `pooled_coefs.csv` | — |
+| 3 | `03_deff.R` | `table_deff.tex`, `deff_{run_prevalence,per_model,components,reml_components_raw}.csv` | — |
+| 4 | `04_human_design.R` | `table_human_llm.tex`, `human_llm_components.csv`, `kern_version_prevalence.csv` | — |
+| 5 | `05_confidence.R` | `table_confidence_permodel.tex`, `confidence_per_model.csv` | `confidence_calibration_and_flips`, `confidence_calibration_two_panel`, `confidence_calibration_per_model` |
+| 6 | `06_prevalence.R` | — | `prevalence_heatmap_all_models_vs_model_mean_stacked`, `prevalence_stability_runs` |
+| 7 | `07_figures.R` | — | `design_effects_families` (from stage 2's coefficient exports) |
+| 8 | `08_paper_tables.R` | `table_framework.tex`, `table_costs.tex`, `annotation_costs.csv` | — |
 
-The design effect (deff) quantifies how much annotation sensitivity inflates variance relative to simple random sampling. We estimate variance components using a crossed random-effects model fit by REML:
+Every figure is written as both `.pdf` and `.png` into `plots/`.
 
-```
-prevalence ~ 1 + (1|model) + (1|condition) + (1|model:condition)
-```
+`00_utils.R` is sourced by every stage. It defines the paths, the model
+constants and plotting theme, the agreement and calibration estimators, the
+LaTeX table writer, and the eligibility filter described below. It runs no
+analysis of its own.
 
-- **σ²_model**: variance attributable to model choice
-- **σ²_condition**: variance attributable to prompt wording (task structure)
-- **σ²_interaction**: residual model × condition interaction
-- **σ²_residual**: within-cell (across-run) replication noise
+## Two things worth knowing before you read the numbers
 
-The design effect is:
+### The eligibility filter
 
-```
-deff = (σ²_model + σ²_condition + σ²_interaction + σ²_residual) / σ²_residual
-```
+`process_raw_data.R` records an outcome that was never elicited as `0`, not
+`NA`. In the separate-call conditions only one construct is asked for: `C.OL`
+elicits offensive language only, `C.HS` hate speech only. The parser therefore
+writes `HS = 0` for every tweet in `C.OL` and `OL = 0` for every tweet in
+`C.HS`.
 
-This replaces an earlier nested decomposition that double-counted shared variance. The crossed model correctly partitions total variance when models and conditions are fully crossed (every model is run under every condition).
+Any analysis that pools conditions without filtering treats those structural
+zeros as substantive negatives, which is fatal for cross-design comparison — it
+inflated apparent instability for GPT-4o-mini to 88.5% against the correct
+27.1%. `eligible()` in `00_utils.R` is the single canonical filter; use it
+rather than rolling your own.
 
-## Reproducibility Notes
+### Caching
 
-- All random seeds are fixed in the raw data (LLM temperature = 0 for deterministic runs where supported; 5 replicate runs per cell otherwise).
-- The pipeline is idempotent: re-running produces identical outputs.
-- Figure output uses `grDevices::pdf()` (not cairo) for macOS compatibility.
-- REML is used for variance-component estimation (unbiased with few groups); AIC/BIC comparisons use ML refit via `lme4::refitML()`.
+Expensive fits are memoised to `outputs/cache/` as `.rds` files. `PIPELINE_REFRESH=1`
+invalidates them and refits from scratch. Stage 02 is the slow one — eight mixed
+logistic regressions over ~756k rows, roughly an hour cold and seconds warm.
+Delete `outputs/cache/` if you change anything upstream of a fit and want to be
+certain the cache is not stale.
+
+## Licensing
+
+Code is MIT (`../LICENSE`). The LLM annotation data and derived outputs are
+CC BY 4.0 (`LICENSE` in this directory), which also carries the Davidson et al.
+MIT notice covering the redistributed tweet text. The Kern et al. reference
+annotations are not redistributed here and remain under their original terms.

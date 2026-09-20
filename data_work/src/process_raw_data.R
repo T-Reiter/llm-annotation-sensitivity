@@ -64,6 +64,25 @@ cat("=== Kern et al. reference ===\n")
 cat(sprintf("Total annotations: %d | OL prevalence: %.3f | HS prevalence: %.3f\n",
             total_ann, overall_OL, overall_HS))
 
+### The analysis uses one specific slice of the Kern et al. study: the five
+### questionnaire versions A-E over the same 3,000 tweets the LLMs annotated,
+### 44,900 annotations from 917 annotators. The public release is larger, so a
+### file downloaded straight from it will not match. Fail here, before anything
+### is written, and say what was found rather than just that an assertion broke.
+if (nrow(kern_full) != 44900) {
+  cat("\n!! The Kern reference data is not the subset this analysis expects.\n")
+  cat(sprintf("   rows       : %d        (expected 44900)\n", nrow(kern_full)))
+  cat(sprintf("   tweets     : %d        (expected 3000)\n",
+              dplyr::n_distinct(kern_full$tweet_id)))
+  cat(sprintf("   annotators : %d        (expected 917)\n",
+              dplyr::n_distinct(kern_full$id)))
+  cat(sprintf("   versions   : %s  (expected A, B, C, D, E)\n",
+              paste(sort(unique(kern_full$version)), collapse = ", ")))
+  cat("   See 'Human reference annotations' in data_work/README.md for how to\n")
+  cat("   reduce the public release to this subset.\n\n")
+  stop("kern_full has ", nrow(kern_full), " rows, expected 44900.", call. = FALSE)
+}
+
 write_csv(kern_full, file.path(PROCESSED, "kern_full.csv"))
 
 ################################################################################
@@ -293,9 +312,8 @@ stopifnot(
   n_distinct(df_long$tweet_id) == 3000,
   all(c("R1", "R2", "R3") %in% unique(df_long$responder)),
   all(model_dirs$model %in% unique(df_long$model)),
-  all(c("A", "B", "C.OL", "C.HS") %in% unique(df_long$task_structure)),
-  nrow(kern_full) == 44900
-)
+  all(c("A", "B", "C.OL", "C.HS") %in% unique(df_long$task_structure))
+)  # kern_full's shape is checked in section 1, before it is written
 
 write_csv(df_long, file.path(PROCESSED, "df_long.csv"))
 write_csv(df_agg,  file.path(PROCESSED, "df_agg.csv"))
