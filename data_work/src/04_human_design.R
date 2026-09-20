@@ -27,8 +27,7 @@
 ### Table 2 that licenses using his data at all.
 ################################################################################
 
-BASEDIR <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-source(file.path(BASEDIR, "data_work", "src", "00_utils.R"))
+source(here::here("data_work", "src", "00_utils.R"))
 suppressPackageStartupMessages({
   library(purrr); library(sandwich); library(lmtest); library(tidyr); library(lme4)
 })

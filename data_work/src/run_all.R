@@ -12,8 +12,9 @@
 ### a hand-made diagram of the prompt conditions.
 ################################################################################
 
-BASEDIR <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-SRC     <- file.path(BASEDIR, "data_work", "src")
+library(here)
+here::i_am("data_work/src/run_all.R")
+SRC <- here("data_work", "src")
 
 STAGES <- c(
   "01_agreement.R"    = "reliability / sensitivity / validity ladder, ICCs, fig:agreements",
@@ -54,8 +55,8 @@ if (length(failed)) {
 
 ### ------------------------------------------------------- what should now exist
 
-OUT   <- file.path(BASEDIR, "data_work", "outputs")
-PLOTS <- file.path(BASEDIR, "plots")
+OUT   <- here("data_work", "outputs")
+PLOTS <- here("plots")
 
 FIGURES <- c("agreements_few_new_conditions_2x1.pdf",
              "design_effects_families.pdf",

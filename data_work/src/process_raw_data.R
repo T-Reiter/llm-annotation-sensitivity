@@ -12,12 +12,16 @@
 library(tidyverse)
 library(data.table)
 
-### Stable paths: the script may be launched from any working directory.
-BASEDIR  <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-DATADIR  <- file.path(BASEDIR, "data_work")
-RAW      <- file.path(DATADIR, "raw")
+### Stable paths, resolved from the repository root (see 00_utils.R).
+library(here)
+here::i_am("data_work/src/process_raw_data.R")
+DATADIR   <- here("data_work")
+RAW       <- file.path(DATADIR, "raw")
 PROCESSED <- file.path(DATADIR, "processed")
-KERN     <- file.path(DATADIR, "Tweets_CK")
+
+### The Kern et al. reference annotations are not redistributed here. Put them
+### in data_work/Tweets_CK/, or set KERN_DATA_DIR to wherever you keep them.
+KERN <- Sys.getenv("KERN_DATA_DIR", unset = file.path(DATADIR, "Tweets_CK"))
 dir.create(PROCESSED, showWarnings = FALSE, recursive = TRUE)
 
 ################################################################################

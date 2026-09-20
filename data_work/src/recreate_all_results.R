@@ -20,11 +20,10 @@ library(tidyverse)
 library(lme4)
 library(lmerTest)
 
-### Setup paths
-if (!exists("BASEDIR")) {
-  BASEDIR <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-}
-DATA <- file.path(BASEDIR, "data_work", "processed")
+### Setup paths (resolved from the repository root; see 00_utils.R)
+library(here)
+here::i_am("data_work/src/recreate_all_results.R")
+DATA <- here("data_work", "processed")
 
 cat("================================================================================\n")
 cat("RECREATING ALL PAPER RESULTS\n")

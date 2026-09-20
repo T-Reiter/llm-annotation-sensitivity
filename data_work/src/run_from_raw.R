@@ -6,8 +6,14 @@
 ###   USE_CACHE=1 Rscript data_work/src/run_from_raw.R
 ################################################################################
 
-BASEDIR <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-SRC <- file.path(BASEDIR, "data_work", "src")
+library(here)
+here::i_am("data_work/src/run_from_raw.R")
+SRC <- here("data_work", "src")
+
+### The Kern et al. reference annotations are not redistributed with this
+### repository. Place them in data_work/Tweets_CK/, or point KERN_DATA_DIR at
+### wherever you keep them.
+KERN <- Sys.getenv("KERN_DATA_DIR", unset = here("data_work", "Tweets_CK"))
 RSCRIPT <- file.path(R.home("bin"), "Rscript")
 
 run_stage <- function(file, env = character()) {
@@ -17,21 +23,21 @@ run_stage <- function(file, env = character()) {
 }
 
 required_raw <- c(
-  file.path(BASEDIR, "data_work", "Tweets_CK", "full_train_s.csv"),
-  file.path(BASEDIR, "data_work", "Tweets_CK", "full_test_s.csv")
+  file.path(KERN, "full_train_s.csv"),
+  file.path(KERN, "full_test_s.csv")
 )
 if (any(!file.exists(required_raw))) {
   stop("Missing raw reference files: ", paste(required_raw[!file.exists(required_raw)], collapse = ", "))
 }
-raw_csv <- list.files(file.path(BASEDIR, "data_work", "raw"), pattern = "[.]csv$",
+raw_csv <- list.files(here("data_work", "raw"), pattern = "[.]csv$",
                       recursive = TRUE, full.names = TRUE)
 if (!length(raw_csv)) stop("No raw LLM annotation CSVs found.")
 cat(sprintf("Found %d raw LLM CSVs and both Kern reference files.\n", length(raw_csv)))
 
 run_stage("process_raw_data.R")
 
-processed <- file.path(BASEDIR, "data_work", "processed",
-                       c("df_long.csv", "df_agg.csv", "prevalences.csv", "kern_full.csv"))
+processed <- here("data_work", "processed",
+                  c("df_long.csv", "df_agg.csv", "prevalences.csv", "kern_full.csv"))
 if (any(!file.exists(processed))) stop("Raw processing did not create every required dataset.")
 
 use_cache <- identical(Sys.getenv("USE_CACHE"), "1")

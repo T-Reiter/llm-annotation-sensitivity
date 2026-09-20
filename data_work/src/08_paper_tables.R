@@ -6,8 +6,7 @@
 ### endpoint prices, and three independent runs.
 ################################################################################
 
-BASEDIR <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-source(file.path(BASEDIR, "data_work", "src", "00_utils.R"))
+source(here::here("data_work", "src", "00_utils.R"))
 
 say <- make_logger("08_paper_tables.log")
 

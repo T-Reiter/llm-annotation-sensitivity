@@ -19,8 +19,7 @@
 ###   plots/agreements_few_new_conditions_2x1.pdf/.png
 ################################################################################
 
-BASEDIR <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-source(file.path(BASEDIR, "data_work", "src", "00_utils.R"))
+source(here::here("data_work", "src", "00_utils.R"))
 suppressPackageStartupMessages({ library(lme4); library(purrr); library(patchwork) })
 
 say <- make_logger("01_agreement.log")

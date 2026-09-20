@@ -12,8 +12,7 @@
 ###   data_work/outputs/pooled_coefs.csv
 ################################################################################
 
-BASEDIR <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-source(file.path(BASEDIR, "data_work", "src", "00_utils.R"))
+source(here::here("data_work", "src", "00_utils.R"))
 
 say <- make_logger("07_figures.log")
 

@@ -25,14 +25,20 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(tidyr)
   library(ggplot2)
+  library(here)
 })
 
-if (!exists("BASEDIR")) {
-  BASEDIR <- "/Users/sseckman/Downloads/Annotation_Sensitivity_in_Large_Language_Models__ACL_ (1)"
-}
-DATA  <- file.path(BASEDIR, "data_work", "processed")
-OUT   <- file.path(BASEDIR, "data_work", "outputs")
-PLOTS <- file.path(BASEDIR, "plots")
+### ------------------------------------------------------------------- paths
+### Every path is resolved from the repository root, which here::i_am() locates
+### by walking up from the working directory until it finds the .here sentinel
+### (or the .git directory / .Rproj file). Nothing in this repository contains
+### an absolute path, so a clone or an unzipped release works unchanged.
+### Run the scripts with the repository root as the working directory.
+here::i_am("data_work/src/00_utils.R")
+
+DATA  <- here("data_work", "processed")
+OUT   <- here("data_work", "outputs")
+PLOTS <- here("plots")
 dir.create(OUT, showWarnings = FALSE, recursive = TRUE)
 
 ### ---------------------------------------------------------------- constants
