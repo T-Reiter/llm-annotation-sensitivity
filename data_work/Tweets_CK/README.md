@@ -67,8 +67,8 @@ public release on Hugging Face:
 
 The Hugging Face dataset contains the complete unpruned collection of $n=89,150$
 crowdsourced annotations across 1,841 annotators and 3,050 tweets. The 44,900 subset
-used in the paper corresponds to taking the first 3 completed human annotations per tweet
-for each of the 5 questionnaire versions (A–E).
+used in the paper corresponds to taking the first 3 annotations per tweet
+(sorted by `annotator_id`) for each of the 5 questionnaire versions (A–E).
 
 You can generate `data_work/processed/kern_full.csv` directly with this Python script:
 
