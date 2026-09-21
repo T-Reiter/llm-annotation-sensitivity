@@ -78,8 +78,8 @@ if (nrow(kern_full) != 44900) {
               dplyr::n_distinct(kern_full$id)))
   cat(sprintf("   versions   : %s  (expected A, B, C, D, E)\n",
               paste(sort(unique(kern_full$version)), collapse = ", ")))
-  cat("   See 'Human reference annotations' in data_work/README.md for how to\n")
-  cat("   reduce the public release to this subset.\n\n")
+  cat("   See data_work/Tweets_CK/README.md for how to download or\n")
+  cat("   generate this reference subset.\n\n")
   stop("kern_full has ", nrow(kern_full), " rows, expected 44900.", call. = FALSE)
 }
 

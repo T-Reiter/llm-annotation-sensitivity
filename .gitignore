@@ -2,7 +2,10 @@
 
 AVA_images/
 Data_Collection/
-Tweets_CK/
+Tweets_CK/*
+!Tweets_CK/README.md
+data_work/Tweets_CK/*
+!data_work/Tweets_CK/README.md
 Davidson_Original_Data/
 
 api_key.py

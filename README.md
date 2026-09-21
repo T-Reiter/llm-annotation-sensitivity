@@ -1,10 +1,9 @@
 # Annotation Sensitivity — Data & Code Pipeline
 
-Reproducibility package for *"Reliable but Sensitive: Evaluating LLM Annotation
-Beyond Performance."*
+Reproducibility package for *"Reliable but Sensitive: Evaluating LLM Annotation Beyond Performance."*
 
 Everything in the paper except `method6.png` (a hand-drawn diagram of the prompt
-conditions) is produced by the R scripts in `src/`.
+conditions) is produced by the R scripts in `data_work/src/`.
 
 ## Quick start
 
@@ -13,24 +12,30 @@ All paths are resolved from the repository root by the
 repository root as your working directory**. No path in this repository is
 absolute; a fresh clone or an unzipped release works unchanged.
 
-A clone contains the code, the raw LLM annotations (`raw/`) and the generated
-figures and tables. It does **not** contain `processed/` — every file there is
+A clone contains the code, the raw LLM annotations (`data_work/raw/`) and the generated
+figures and tables. It does **not** contain `data_work/processed/` — every file there is
 rebuilt by `process_raw_data.R`. Rebuilding also needs the Kern et al. human
-annotations, which are not redistributed here; see *Input data* below for where
-to get them.
+annotations, which are not redistributed here; see *Input data* below for how to
+download them.
 
 ```bash
 cd /path/to/llm-annotation-sensitivity
 
-# 1. put the Kern et al. files in data_work/Tweets_CK/ (or set KERN_DATA_DIR)
-# 2. raw data -> processed data -> every table and figure in the paper:
+# 1. Download the Kern et al. reference files into data_work/Tweets_CK/
+mkdir -p data_work/Tweets_CK
+curl -sL https://raw.githubusercontent.com/chkern/tweet-annotation-sensitivity/main/data/full_train_s.csv \
+  -o data_work/Tweets_CK/full_train_s.csv
+curl -sL https://raw.githubusercontent.com/chkern/tweet-annotation-sensitivity/main/data/full_test_s.csv \
+  -o data_work/Tweets_CK/full_test_s.csv
+
+# 2. Raw data -> processed data -> every table and figure in the paper:
 Rscript data_work/src/run_from_raw.R
 
-# same, but reuse any model fits already cached in outputs/cache/:
+# Same, but reuse any model fits already cached in data_work/outputs/cache/:
 USE_CACHE=1 Rscript data_work/src/run_from_raw.R
 ```
 
-Once `processed/` exists you can re-run the analysis alone, without touching the
+Once `data_work/processed/` exists you can re-run the analysis alone, without touching the
 raw data:
 
 ```bash
@@ -38,7 +43,7 @@ Rscript data_work/src/run_all.R                      # stages 01-08, cached fits
 PIPELINE_REFRESH=1 Rscript data_work/src/run_all.R   # force a full refit
 ```
 
-`src/recreate_all_results.R` is a standalone alternative that recomputes the
+`data_work/src/recreate_all_results.R` is a standalone alternative that recomputes the
 headline numbers from the processed data in a single process, without the
 caching or the LaTeX writers. It is a cross-check on `run_all.R`, not a
 replacement for it.
@@ -60,7 +65,7 @@ device is required.
 
 ## Input data
 
-### LLM annotations — `raw/`
+### LLM annotations — `data_work/raw/`
 
 36 CSVs across nine model directories. Folder names map to canonical model
 names in `process_raw_data.R`:
@@ -102,8 +107,8 @@ hate-speech and offensive language corpus:
 
 They reach this repository through the subsample that Kern et al. (2023) had
 annotated by human coders. The corpus is MIT licensed, so the tweet text is
-redistributed here with Davidson et al.'s notice retained (see `LICENSE` in this
-directory). Screen names are masked and URLs are stripped in every copy. If you
+redistributed here with Davidson et al.'s notice retained (see `data_work/LICENSE`).
+Screen names are masked and URLs are stripped in every copy. If you
 use this data, cite the original corpus:
 
 > Davidson, T., Warmsley, D., Macy, M., & Weber, I. (2017). Automated Hate
@@ -115,73 +120,49 @@ Be aware of what the corpus contains: it was assembled to study hate speech and
 offensive language, and the tweet text is racist, sexist, homophobic and
 otherwise offensive throughout.
 
-### Human reference annotations — `Tweets_CK/` (not included)
+### Human reference annotations — `data_work/Tweets_CK/` (not included)
 
-The Kern et al. (2023) human annotations of these tweets are **not**
-redistributed in this repository. Get them from:
+The Kern et al. (2023) human reference annotations are **not** redistributed in
+this repository.
 
-> <https://huggingface.co/datasets/soda-lmu/tweet-annotation-sensitivity-2>
-
-**The public release is larger than what this analysis uses.** It holds roughly
-89,000 annotations; the paper uses one slice of 44,900. Before running anything,
-reduce your download to a subset with this fingerprint:
-
-| | Expected |
-|---|---|
-| Annotations (rows, both files combined) | 44,900 |
-| Distinct tweets | 3,000 |
-| Distinct annotators | 917 |
-| Questionnaire versions | A, B, C, D, E |
-| Split | 33,683 train / 11,217 test |
-
-`process_raw_data.R` checks this before writing anything and prints what it
-found against what it expected, so a wrong subset fails immediately rather than
-producing quietly wrong numbers.
-
-The script expects the subset split across two CSVs, `full_train_s.csv` and
-`full_test_s.csv`, carrying at least these columns:
-
-| Column | Meaning |
-|---|---|
-| `tweet.id` | tweet identifier, joins to the LLM annotations |
-| `id` | annotator identifier |
-| `version` | questionnaire version the annotator saw |
-| `batch.tweet` | position of the tweet within the annotator's batch |
-| `hate.speech` | human hate-speech label |
-| `offensive.language` | human offensive-language label |
-| `tweet_hashed` | tweet text with screen names masked |
-
-The two files are concatenated into `processed/kern_full.csv`, and the script
-asserts the result has 44,900 rows. Put them in `data_work/Tweets_CK/`, or point
-the pipeline elsewhere:
+Before running the pipeline, download the two reference CSV files (`full_train_s.csv`
+and `full_test_s.csv`, $n=44,900$ combined) into `data_work/Tweets_CK/`:
 
 ```bash
-KERN_DATA_DIR=/path/to/kern Rscript data_work/src/run_from_raw.R
+mkdir -p data_work/Tweets_CK
+curl -sL https://raw.githubusercontent.com/chkern/tweet-annotation-sensitivity/main/data/full_train_s.csv \
+  -o data_work/Tweets_CK/full_train_s.csv
+curl -sL https://raw.githubusercontent.com/chkern/tweet-annotation-sensitivity/main/data/full_test_s.csv \
+  -o data_work/Tweets_CK/full_test_s.csv
 ```
 
-Only `process_raw_data.R` reads them; the analysis stages use the processed
-`kern_full.csv`.
+For full details on this reference dataset, its schema, expected fingerprints, or
+how to generate it directly from the Hugging Face release, see
+[`data_work/Tweets_CK/README.md`](data_work/Tweets_CK/README.md).
+
 
 ## Directory layout
 
 ```
-data_work/
+llm-annotation-sensitivity/
 ├── README.md                  ← this file
-├── LICENSE                    ← CC BY 4.0 for the data (code is MIT, see ../LICENSE)
-├── raw/                       ← 36 LLM annotation CSVs in 9 model directories
-├── Tweets_CK/                 ← Kern et al. reference data (gitignored, not shipped)
-├── processed/                 ← built by process_raw_data.R (gitignored)
-│   ├── df_long.csv            ← tweet × condition × run × model, ~756k rows
-│   ├── df_agg.csv             ← modal labels per tweet × condition × model
-│   ├── prevalences.csv        ← prevalence per model × condition × run
-│   └── kern_full.csv          ← combined Kern reference annotations
-├── outputs/                   ← LaTeX fragments, coefficient exports, cache/
-└── src/                       ← all analysis code (old/ is an unused archive)
-
-plots/                         ← generated figures, sibling to data_work/
+├── LICENSE                    ← MIT license for code
+├── plots/                     ← generated figures (pdf & png)
+└── data_work/
+    ├── README.md              ← data pipeline notes
+    ├── LICENSE                ← CC BY 4.0 for data (with Davidson et al. notice)
+    ├── raw/                   ← 36 LLM annotation CSVs in 9 model directories
+    ├── Tweets_CK/             ← Kern et al. reference data (gitignored, not shipped)
+    ├── processed/             ← built by process_raw_data.R (gitignored)
+    │   ├── df_long.csv        ← tweet × condition × run × model, ~756k rows
+    │   ├── df_agg.csv         ← modal labels per tweet × condition × model
+    │   ├── prevalences.csv    ← prevalence per model × condition × run
+    │   └── kern_full.csv      ← combined Kern reference annotations
+    ├── outputs/               ← LaTeX fragments, coefficient exports, cache/
+    └── src/                   ← all analysis code
 ```
 
-Nothing in `processed/` is committed — all four files are rebuilt by
+Nothing in `data_work/processed/` is committed — all four files are rebuilt by
 `process_raw_data.R`, and `kern_full.csv` in particular is derived from data this
 repository does not redistribute. Stages 01–06 read `df_long.csv`; stage 04 also
 reads `kern_full.csv`. Run `process_raw_data.R` (or `run_from_raw.R`) before
@@ -229,15 +210,15 @@ rather than rolling your own.
 
 ### Caching
 
-Expensive fits are memoised to `outputs/cache/` as `.rds` files. `PIPELINE_REFRESH=1`
+Expensive fits are memoised to `data_work/outputs/cache/` as `.rds` files. `PIPELINE_REFRESH=1`
 invalidates them and refits from scratch. Stage 02 is the slow one — eight mixed
 logistic regressions over ~756k rows, roughly an hour cold and seconds warm.
-Delete `outputs/cache/` if you change anything upstream of a fit and want to be
+Delete `data_work/outputs/cache/` if you change anything upstream of a fit and want to be
 certain the cache is not stale.
 
 ## Licensing
 
-Code is MIT (`../LICENSE`). The LLM annotation data and derived outputs are
-CC BY 4.0 (`LICENSE` in this directory), which also carries the Davidson et al.
+Code is MIT ([`LICENSE`](LICENSE)). The LLM annotation data and derived outputs are
+CC BY 4.0 ([`data_work/LICENSE`](data_work/LICENSE)), which also carries the Davidson et al.
 MIT notice covering the redistributed tweet text. The Kern et al. reference
 annotations are not redistributed here and remain under their original terms.
