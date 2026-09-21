@@ -44,9 +44,8 @@ dir.create(OUT, showWarnings = FALSE, recursive = TRUE)
 ### ---------------------------------------------------------------- constants
 
 ## The seven models reported in the paper. GPT-4o-mini is the reference
-## category throughout. The processed data also contain GPT-4o-mini_run2 (a
-## re-collection ten months later, used only for the temporal-drift check) and
-## GPT-5.4-mini; both are excluded from every reported result.
+## category throughout. The processed data also contain GPT-5.4-mini, which
+## is excluded from every reported result.
 MODEL_ORDER <- c("GPT-4o-mini", "GPT-5.4", "Mistral-Large-3", "Mistral-Medium-3.5",
                  "Llama-3.1-8B", "Llama-3.1-70B", "Llama-4")
 

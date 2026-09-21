@@ -93,7 +93,6 @@ write_csv(kern_full, file.path(PROCESSED, "kern_full.csv"))
 model_dirs <- tribble(
   ~folder,                            ~model,
   "GPT4o_mini",                       "GPT-4o-mini",
-  "GPT54_mini_run1_actually_4o_mini", "GPT-4o-mini_run2",
   "GPT5.4",                           "GPT-5.4",
   "GPT5.4_mini",                      "GPT-5.4-mini",
   "Llama3.1_8B_new",                  "Llama-3.1-8B",

@@ -43,10 +43,7 @@ kern_full <- read_csv(file.path(DATA, "kern_full.csv"), show_col_types = FALSE)
 MODEL_ORDER <- c("GPT-4o-mini", "GPT-5.4", "Mistral-Large-3", "Mistral-Medium-3.5",
                  "Llama-3.1-8B", "Llama-3.1-70B", "Llama-4")
 
-# Filter to only the 7 canonical models.
-# GPT-4o-mini_run2 is a second data collection run of GPT-4o-mini, used only
-# for reliability checks in the Python scripts. The Python analysis_utils.py
-# filters to MODEL_ORDER which excludes it (and GPT-5.4-mini).
+# Filter to only the 7 canonical models (excludes GPT-5.4-mini).
 df_long <- df_long %>% filter(model %in% MODEL_ORDER)
 df_agg  <- df_agg  %>% filter(model %in% MODEL_ORDER)
 prevalences <- prevalences %>% filter(model %in% MODEL_ORDER)

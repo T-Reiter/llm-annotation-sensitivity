@@ -67,7 +67,7 @@ device is required.
 
 ### LLM annotations — `data_work/raw/`
 
-36 CSVs across nine model directories. Folder names map to canonical model
+32 CSVs across eight model directories. Folder names map to canonical model
 names in `process_raw_data.R`:
 
 | Folder | Model |
@@ -75,7 +75,6 @@ names in `process_raw_data.R`:
 | `GPT4o_mini` | GPT-4o-mini |
 | `GPT5.4` | GPT-5.4 |
 | `GPT5.4_mini` | GPT-5.4-mini |
-| `GPT54_mini_run1_actually_4o_mini` | GPT-4o-mini_run2 |
 | `Llama3.1_8B_new` | Llama-3.1-8B |
 | `Llama3.1_70B_new` | Llama-3.1-70B |
 | `Llama4` | Llama-4 |
@@ -83,8 +82,7 @@ names in `process_raw_data.R`:
 | `MistralMedium3.5_new` | Mistral-Medium-3.5 |
 
 Seven of these are reported in the paper (`MODEL_ORDER` in `00_utils.R`).
-`GPT-4o-mini_run2` is a re-collection ten months later, used only for the
-temporal-drift check; `GPT-5.4-mini` is excluded from every reported result.
+`GPT-5.4-mini` is excluded from every reported result.
 
 Each model was run over 3,000 tweets in 16 conditions × 3 replicate runs. The
 16 conditions cross four task structures with batching and confidence
